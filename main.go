@@ -71,6 +71,28 @@ func (g *game) getInitialPlayerPos() {
 
 func (g *game) Layout(outWidth, outHeight int) (w, h int) { return sw, sh }
 func (g *game) Update() error {
+	// Movement:
+	if ebiten.IsKeyPressed(ebiten.KeyW) {
+		if g.maze[g.playerPos.Y-1][g.playerPos.X] == 0 {
+			g.playerPos.Y--
+		}
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyS) {
+		if g.maze[g.playerPos.Y+1][g.playerPos.X] == 0 {
+			g.playerPos.Y++
+		}
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyD) {
+		if g.maze[g.playerPos.Y][g.playerPos.X+1] == 0 {
+			g.playerPos.X++
+		}
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyA) {
+		if g.maze[g.playerPos.Y][g.playerPos.X-1] == 0 {
+			g.playerPos.X--
+		}
+	}
+
 	return nil
 }
 func (g *game) Draw(screen *ebiten.Image) {
