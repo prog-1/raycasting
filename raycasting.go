@@ -24,38 +24,36 @@ import (
 - FoV rays ✔
 - i = i-1 ✔
 
-- player movement
-- player rotation
+- player movement ✔
+- player rotation ✔
 
-- collisions
+- collisions (I blowed up my head and wasted 3 hours on that one) ✔
 
 */
 //-------------------------Declaration------------------------------
 
 const (
-	sW        = 1280 //screen width
-	sH        = 720  //screen height
-	mW        = 600  //map width
-	mH        = 600  //map height
-	cellSize  = 25   // size of each cell in pixels
-	segNumber = 100  // number of segments of camera plane vector for rays
+	sW       = 1280 //screen width
+	sH       = 720  //screen height
+	mW       = 600  //map width
+	mH       = 600  //map height
+	cellSize = 25   // size of each cell in pixels
+	viewLen  = 150  //lenght of player view and camera plane lines
+	//if len of viewDir = len of camPlane, then FoV = 90 degrees
+	segNumber = 100 // number of segments of camera plane line for rays
 )
 
 type Game struct {
 	width, height int //screen width and height
 	//global variables
-	gameMap     [][]int //game map 2d matrix
-	mapPos      point   //map position on the screen (top left corner)
-	playerStart point   //player start position
-	viewDir     line    //player view direction vector (ray)
-	camPlane    line    // camera 1/2 plane vector
+	gameMap   [][]int //game map 2d matrix
+	mapPos    vector  //map position on the screen (top left corner)
+	playerPos vector  //player position
+	playerDir vector  //player view direction
+	camPlane  line    // camera plane(screen)
 }
 
-type point struct {
-	x, y float64
-}
-
-//line with start & end point
+//line with start & end points
 type line struct {
 	a, b vector
 }
@@ -67,8 +65,55 @@ type vector struct {
 //---------------------------Update-------------------------------------
 
 func (g *Game) Update() error {
-	//all logic on update
-	//can be divided on seperate functions (i.e. "UpdateCircle")
+
+	//Player WASD Movement
+	if ebiten.IsKeyPressed(ebiten.KeyW) {
+		//collision handling
+		if g.gameMap[int((g.playerPos.y-1-g.mapPos.y)/cellSize)][int((g.playerPos.x-g.mapPos.x)/cellSize)] == 0 {
+			g.playerPos.y--
+			g.playerDir.y--
+			g.camPlane.a.y--
+			g.camPlane.b.y--
+		}
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyS) {
+		//collision handling
+		if g.gameMap[int((g.playerPos.y+1-g.mapPos.y)/cellSize)][int((g.playerPos.x-g.mapPos.x)/cellSize)] == 0 {
+			g.playerPos.y++
+			g.playerDir.y++
+			g.camPlane.a.y++
+			g.camPlane.b.y++
+		}
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyA) {
+		//collision handling
+		if g.gameMap[int((g.playerPos.y-g.mapPos.y)/cellSize)][int((g.playerPos.x-1-g.mapPos.x)/cellSize)] == 0 {
+			g.playerPos.x--
+			g.playerDir.x--
+			g.camPlane.a.x--
+			g.camPlane.b.x--
+		}
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyD) {
+		//collision handling
+		if g.gameMap[int((g.playerPos.y-g.mapPos.y)/cellSize)][int((g.playerPos.x+1-g.mapPos.x)/cellSize)] == 0 {
+			g.playerPos.x++
+			g.playerDir.x++
+			g.camPlane.a.x++
+			g.camPlane.b.x++
+		}
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) {
+		g.playerDir = rotate(g.playerDir, g.playerPos, -math.Pi/200)
+		g.camPlane.a = rotate(g.camPlane.a, g.playerPos, -math.Pi/200)
+		g.camPlane.b = rotate(g.camPlane.b, g.playerPos, -math.Pi/200)
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyArrowRight) {
+		g.playerDir = rotate(g.playerDir, g.playerPos, math.Pi/200)
+		g.camPlane.a = rotate(g.camPlane.a, g.playerPos, math.Pi/200)
+		g.camPlane.b = rotate(g.camPlane.b, g.playerPos, math.Pi/200)
+	}
+
 	return nil
 }
 
@@ -95,29 +140,42 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		}
 	}
 
-	//draw player
-	ebitenutil.DrawCircle(screen, g.playerStart.x, g.playerStart.y, 10, color.RGBA{100, 180, 255, 255} /*Light blue*/)
+	//Draw player
+	ebitenutil.DrawCircle(screen, g.playerPos.x, g.playerPos.y, 10, color.RGBA{100, 180, 255, 255} /*Light blue*/)
 
-	//FOV:
+	//# FIELD OF VIEW #
 
-	//RAYS
+	//# Ray Drawing #
 	//segment length for each projection
 	segLenX := (g.camPlane.b.x - g.camPlane.a.x) / segNumber
 	segLenY := (g.camPlane.b.y - g.camPlane.a.y) / segNumber
 
 	for i := 0.0; i <= segNumber; i++ { //for each segment
-		ebitenutil.DrawLine(screen, g.viewDir.a.x, g.viewDir.a.y, g.camPlane.a.x+(segLenX*i), g.camPlane.a.y+(segLenY*i), color.RGBA{242, 207, 85, 200} /*Yellow*/) //draw ray
+		ebitenutil.DrawLine(screen, g.playerPos.x, g.playerPos.y, g.camPlane.a.x+(segLenX*i), g.camPlane.a.y+(segLenY*i), color.RGBA{242, 207, 85, 200} /*Yellow*/) //draw ray
 	}
 
-	//draw player view vector
-	ebitenutil.DrawLine(screen, g.viewDir.a.x, g.viewDir.a.y, g.viewDir.b.x, g.viewDir.b.y, color.RGBA{255, 146, 28, 200} /*Orange*/)
+	//player view line drawing
+	ebitenutil.DrawLine(screen, g.playerPos.x, g.playerPos.y, g.playerDir.x, g.playerDir.y, color.RGBA{255, 146, 28, 200} /*Orange*/)
 
-	//draw camera plane vector
+	//camera plane line drawing
 	ebitenutil.DrawLine(screen, g.camPlane.a.x, g.camPlane.a.y, g.camPlane.b.x, g.camPlane.b.y, color.RGBA{132, 132, 255, 200} /*Blue*/)
 
 }
 
 //-------------------------Functions----------------------------------
+
+func rotate(p, rp vector, angle float64) (res vector) { //p - point | cp - center point
+
+	res = subtract(p, rp)
+
+	//Rotation
+	res.x = (res.x)*math.Cos(angle) - (res.y)*math.Sin(angle)
+	res.y = (res.x)*math.Sin(angle) + (res.y)*math.Cos(angle)
+
+	res = add(res, rp)
+
+	return
+}
 
 func len(v vector) float64 {
 	return math.Sqrt((v.x * v.x) + (v.y * v.y))
@@ -129,8 +187,14 @@ func subtract(a, b vector) (res vector) {
 	return res
 }
 
+func add(a, b vector) (res vector) {
+	res.x = a.x + b.x
+	res.y = a.y + b.y
+	return res
+}
+
 //draw cell with proper color
-func drawCell(screen *ebiten.Image, mapPos point, ci, cj int, clr color.RGBA) { //ci & cj - cell index in gameMap
+func drawCell(screen *ebiten.Image, mapPos vector, ci, cj int, clr color.RGBA) { //ci & cj - cell index in gameMap
 
 	//  map position  +  cell position
 	cX := mapPos.x + float64((cj * cellSize))
@@ -190,14 +254,10 @@ func main() {
 //New game instance function
 func NewGame(width, height int) *Game {
 
-	mapPos := point{(sW / 2) - (mW / 2), (sH / 2) - (mH / 2)} // map position
-	playerStart := point{sW / 2, sH / 2}                      //player start position
+	mapPos := vector{(sW / 2) - (mW / 2), (sH / 2) - (mH / 2)}                                               // map position
+	playerStartPos := vector{sW / 2, sH / 2}                                                                 //player initial position
+	playerDir := vector{playerStartPos.x, playerStartPos.y - viewLen}                                        //player view direction
+	camPlane := line{vector{playerDir.x - viewLen, playerDir.y}, vector{playerDir.x + viewLen, playerDir.y}} //camera plane line
 
-	//Field of View
-	len := 150.0 //lenght of player view and camera plane vectors
-	//if len viewDir = len camPlane, then FoV = 90 degrees
-	viewDir := line{vector{playerStart.x, playerStart.y}, vector{playerStart.x, playerStart.y - len}} //player view direciton vector
-	camPlane := line{vector{viewDir.b.x - len, viewDir.b.y}, vector{viewDir.b.x + len, viewDir.b.y}}  // camera plane vector
-
-	return &Game{width: width, height: height, gameMap: initGameMap(), mapPos: mapPos, playerStart: playerStart, viewDir: viewDir, camPlane: camPlane}
+	return &Game{width: width, height: height, gameMap: initGameMap(), mapPos: mapPos, playerPos: playerStartPos, playerDir: playerDir, camPlane: camPlane}
 }
