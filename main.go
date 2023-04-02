@@ -22,9 +22,9 @@ type Pair[T, U any] struct {
 }
 
 type Player struct {
-	Pos   v.Vec
-	Dir   v.Vec
-	speed float64
+	Pos    v.Vec
+	Dir    v.Vec
+	ms, rs float64 // Movement and Rotation speed
 }
 
 type game struct {
@@ -88,7 +88,7 @@ func InitPlayer(maze [mh][mw]int) Player {
 		}
 	}
 
-	return Player{v.Vec{float64(x)*sqw + sqw/2, float64(y)*sqh + sqh/2, 0}, v.Vec{1, 0, 0}, 0.2}
+	return Player{v.Vec{float64(x)*sqw + sqw/2, float64(y)*sqh + sqh/2, 0}, v.Vec{1, 0, 0}, 0.2, 0.01}
 }
 
 func (g *game) Layout(outWidth, outHeight int) (w, h int) { return sw, sh }
@@ -100,28 +100,31 @@ func (g *game) Update() error {
 	in := Pair[int, int]{int(g.p.Pos.X / sqw), int(g.p.Pos.Y / sqh)} // pos = in * sqw => in = pos/sqw
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
 		if g.maze[in.Y-1][in.X] == 0 {
-			g.p.Pos.Y -= g.p.speed * dt
+			g.p.Pos.Y -= g.p.ms * dt
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
 		if g.maze[in.Y+1][in.X] == 0 {
-			g.p.Pos.Y += g.p.speed * dt
+			g.p.Pos.Y += g.p.ms * dt
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
 		if g.maze[in.Y][in.X-1] == 0 {
-			g.p.Pos.X -= g.p.speed * dt
+			g.p.Pos.X -= g.p.ms * dt
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
 		if g.maze[in.Y][in.X+1] == 0 {
-			g.p.Pos.X += g.p.speed * dt
+			g.p.Pos.X += g.p.ms * dt
 		}
 	}
 
 	// Rotation
 	if ebiten.IsKeyPressed(ebiten.KeyQ) {
-		g.p.Dir.RotateZ(0.01 * dt)
+		g.p.Dir.RotateZ(g.p.rs * dt)
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyE) {
+		g.p.Dir.RotateZ(-g.p.rs * dt)
 	}
 	return nil
 }
