@@ -25,6 +25,7 @@ type Player struct {
 	Pos    v.Vec
 	Dir    v.Vec
 	ms, rs float64 // Movement and Rotation speed
+	a, h   int     // base length and height of player's FOV triangle
 }
 
 type game struct {
@@ -88,7 +89,7 @@ func InitPlayer(maze [mh][mw]int) Player {
 		}
 	}
 
-	return Player{v.Vec{float64(x)*sqw + sqw/2, float64(y)*sqh + sqh/2, 0}, v.Vec{1, 0, 0}, 0.2, 0.01}
+	return Player{v.Vec{float64(x)*sqw + sqw/2, float64(y)*sqh + sqh/2, 0}, v.Vec{1, 0, 0}, 0.2, 0.01, 50, 25}
 }
 
 func (g *game) Layout(outWidth, outHeight int) (w, h int) { return sw, sh }
@@ -136,9 +137,11 @@ func (g *game) Draw(screen *ebiten.Image) {
 			}
 		}
 	}
-	in := Pair[int, int]{int(g.p.Pos.X / sqw), int(g.p.Pos.Y / sqh)} // pos = in * sqw => in = pos/sqw
-	ebitenutil.DrawRect(screen, sqw*float64(in.X), sqh*float64(in.Y), sqw, sqh, color.RGBA{255, 255, 0, 255} /*yellow*/)
-	ebitenutil.DrawLine(screen, g.p.Pos.X, g.p.Pos.Y, g.p.Pos.X+g.p.Dir.X*10, g.p.Pos.Y-g.p.Dir.Y*10, color.RGBA{124, 252, 0, 255})
+	in := Pair[int, int]{int(g.p.Pos.X / sqw), int(g.p.Pos.Y / sqh)}                   // pos = in * sqw => in = pos/sqw
+	cp := Pair[float64, float64]{sqw*float64(in.X) + sqw/2, sqh*float64(in.Y) + sqh/2} // Pos of Player's Cell center
+	ebitenutil.DrawRect(screen, cp.X-sqw/2, cp.Y-sqh/2, sqw, sqh, color.RGBA{255, 255, 0, 255} /*yellow*/)
+	ebitenutil.DrawLine(screen, cp.X, cp.Y, cp.X+g.p.Dir.X*10, cp.Y-g.p.Dir.Y*10, color.RGBA{124, 252, 0, 255})
+
 }
 
 func main() {
