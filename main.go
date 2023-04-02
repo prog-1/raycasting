@@ -3,6 +3,7 @@ package main
 import (
 	"image/color"
 	"log"
+	"math"
 	"time"
 
 	v "github.com/34thSchool/vectors"
@@ -11,10 +12,18 @@ import (
 )
 
 const (
-	sw, sh   = 640, 480
-	mw, mh   = 24, 24                             // map width/height
-	sqw, sqh = float64(sw) / mw, float64(sh) / mh // square width/height
+	sw, sh = 640, 480
+	mw, mh = 24, 24                             // map width/height
+	cw, ch = float64(sw) / mw, float64(sh) / mh // cell width/height
 )
+
+func rtg(a float64) int { // Round to greatest
+	if i := int(a); float64(i) < a {
+		return i + 1
+	} else {
+		return i
+	}
+}
 
 type Pair[T, U any] struct {
 	X T
@@ -33,6 +42,7 @@ type game struct {
 	maze          *[mh][mw]int
 	p             Player
 	prevFrameTime int64
+	rc            int //Ray Count
 }
 
 func NewGame() *game {
@@ -73,6 +83,7 @@ func NewGame() *game {
 		&maze,
 		InitPlayer(maze),
 		0,
+		101,
 	}
 }
 
@@ -89,7 +100,7 @@ func InitPlayer(maze [mh][mw]int) Player {
 		}
 	}
 
-	return Player{v.Vec{float64(x)*sqw + sqw/2, float64(y)*sqh + sqh/2, 0}, v.Vec{1, 0, 0}, 0.2, 0.01, 50, 25}
+	return Player{v.Vec{float64(x)*cw + cw/2, float64(y)*ch + ch/2, 0}, v.Vec{1, 0, 0}, 0.2, 0.01, 500, 250}
 }
 
 func (g *game) Layout(outWidth, outHeight int) (w, h int) { return sw, sh }
@@ -98,7 +109,8 @@ func (g *game) Update() error {
 	g.prevFrameTime = time.Now().UnixMilli()
 
 	// Movement:
-	in := Pair[int, int]{int(g.p.Pos.X / sqw), int(g.p.Pos.Y / sqh)} // pos = in * sqw => in = pos/sqw
+	in := Pair[int, int]{rtg(g.p.Pos.X / cw), rtg(g.p.Pos.Y / ch)} // pos = in * sqw => in = pos/sqw
+
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
 		if g.maze[in.Y-1][in.X] == 0 {
 			g.p.Pos.Y -= g.p.ms * dt
@@ -122,26 +134,44 @@ func (g *game) Update() error {
 
 	// Rotation
 	if ebiten.IsKeyPressed(ebiten.KeyQ) {
-		g.p.Dir.RotateZ(g.p.rs * dt)
+		g.p.Dir = *v.RotateZ(&g.p.Dir, -g.p.rs*dt)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyE) {
-		g.p.Dir.RotateZ(-g.p.rs * dt)
+		g.p.Dir = *v.RotateZ(&g.p.Dir, g.p.rs*dt)
 	}
 	return nil
 }
 func (g *game) Draw(screen *ebiten.Image) {
+
+	drawLine := func(a, b v.Vec, clr color.Color) {
+		ebitenutil.DrawLine(screen, a.X, a.Y, b.X, b.Y, clr)
+	}
+
+	// Maze
 	for y := range g.maze {
 		for x := range g.maze[y] {
 			if g.maze[y][x] != 0 {
-				ebitenutil.DrawRect(screen, sqw*float64(x), float64(y)*sqh, sqw, sqh, color.RGBA{255, 192, 203, 255})
+				ebitenutil.DrawRect(screen, cw*float64(x), float64(y)*ch, cw, ch, color.RGBA{255, 192, 203, 255})
 			}
 		}
 	}
-	in := Pair[int, int]{int(g.p.Pos.X / sqw), int(g.p.Pos.Y / sqh)}                   // pos = in * sqw => in = pos/sqw
-	cp := Pair[float64, float64]{sqw*float64(in.X) + sqw/2, sqh*float64(in.Y) + sqh/2} // Pos of Player's Cell center
-	ebitenutil.DrawRect(screen, cp.X-sqw/2, cp.Y-sqh/2, sqw, sqh, color.RGBA{255, 255, 0, 255} /*yellow*/)
-	ebitenutil.DrawLine(screen, cp.X, cp.Y, cp.X+g.p.Dir.X*10, cp.Y-g.p.Dir.Y*10, color.RGBA{124, 252, 0, 255})
 
+	// Player
+	in := Pair[int, int]{rtg(g.p.Pos.X / cw), rtg(g.p.Pos.Y / ch)}  // pos = in * sqw => in = pos/sqw
+	p := v.Vec{cw*float64(in.X) + cw/2, ch*float64(in.Y) + ch/2, 0} // Pos of Player's Cell center
+	h := v.Mul(g.p.Dir, float64(g.p.h))
+	drawLine(p, v.Add(p, h), color.RGBA{124, 252, 0, 255})
+
+	// Rays
+	r := v.Mul(*v.RotateZ(&g.p.Dir, math.Pi/2), float64(g.p.a)/2)
+	pa, pb := v.Sub(h, r), v.Add(h, r)
+	ab := v.Sub(pb, pa)
+	for i := 0; i < g.rc; i++ {
+		ak := v.Mul(v.Div(ab, float64(g.rc)), float64(i))
+		pk := v.Add(pa, ak)
+		k := v.Add(p, pk)
+		drawLine(p, k, color.RGBA{255, 255, 0, 255})
+	}
 }
 
 func main() {
