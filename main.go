@@ -52,6 +52,35 @@ type Game struct {
 }
 
 func (g *Game) Update() error {
+	if ebiten.IsKeyPressed(ebiten.KeyW) {
+		a := int(g.pos.x) / int(oneBlockWidthLength)
+		b := int(g.pos.y-1) / int(oneBlockHeightLength)
+		if maze[b][a] == 0 {
+			g.pos.y--
+		}
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyS) {
+		a := int(g.pos.x) / int(oneBlockWidthLength)
+		b := int(g.pos.y+1) / int(oneBlockHeightLength)
+		if maze[b][a] == 0 {
+			g.pos.y++
+		}
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyA) {
+		a := int(g.pos.x-1) / int(oneBlockWidthLength)
+		b := int(g.pos.y) / int(oneBlockHeightLength)
+		if maze[b][a] == 0 {
+			g.pos.x--
+		}
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyD) {
+		a := int(g.pos.x+1) / int(oneBlockWidthLength)
+		b := int(g.pos.y) / int(oneBlockHeightLength)
+		if maze[b][a] == 0 {
+			g.pos.x++
+		}
+	}
+
 	return nil
 }
 func Rotate(a Point, angle float64) Point {
@@ -79,6 +108,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		tmp := Rotate(g.dir, i*math.Pi/180)
 		ebitenutil.DrawLine(screen, g.pos.x, g.pos.y, g.pos.x+tmp.x, g.pos.y+tmp.y, color.RGBA{255, 255, 0, 255})
 	}
+
+	// ebitenutil.DrawRect(screen, float64(a*oneBlockWidthLength), float64(b*oneBlockHeightLength), float64(oneBlockWidthLength), float64(oneBlockHeightLength), color.RGBA{0, 0, 255, 255})
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
