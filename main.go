@@ -80,6 +80,12 @@ func (g *Game) Update() error {
 			g.pos.x++
 		}
 	}
+	if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) {
+		g.dir = Rotate(g.dir, -math.Pi/360)
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyArrowRight) {
+		g.dir = Rotate(g.dir, math.Pi/360)
+	}
 
 	return nil
 }
