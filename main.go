@@ -100,39 +100,27 @@ func (g *game) Update() error {
 	dt := float64(time.Now().UnixMilli() - g.prevFrameTime)
 	g.prevFrameTime = time.Now().UnixMilli()
 
-	// Movement:
-
-	if ebiten.IsKeyPressed(ebiten.KeyW) {
-		np := g.p.Pos // np - new pos
-		np.Y -= g.p.ms * dt
+	// dp - delta position(new pos - cur pos)
+	upp := func(dp v.Vec) { // Update player's position
+		np := v.Add(g.p.Pos, dp) // new pos
 		in := Pair[int, int]{int(np.X / cw), int(np.Y / ch)}
 		if g.maze[in.Y][in.X] == 0 {
 			g.p.Pos = np
 		}
+	}
+
+	// Movement:
+	if ebiten.IsKeyPressed(ebiten.KeyW) {
+		upp(v.Mul(g.p.Dir, g.p.ms*dt))
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		np := g.p.Pos // np - new pos
-		np.Y += g.p.ms * dt
-		in := Pair[int, int]{int(np.X / cw), int(np.Y / ch)}
-		if g.maze[in.Y][in.X] == 0 {
-			g.p.Pos = np
-		}
+		upp(v.Mul(g.p.Dir, -g.p.ms*dt))
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		np := g.p.Pos // np - new pos
-		np.X -= g.p.ms * dt
-		in := Pair[int, int]{int(np.X / cw), int(np.Y / ch)}
-		if g.maze[in.Y][in.X] == 0 {
-			g.p.Pos = np
-		}
+		upp(v.Mul(*v.RotateZ(&g.p.Dir, -math.Pi/2), g.p.ms*dt))
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		np := g.p.Pos // np - new pos
-		np.X += g.p.ms * dt
-		in := Pair[int, int]{int(np.X / cw), int(np.Y / ch)}
-		if g.maze[in.Y][in.X] == 0 {
-			g.p.Pos = np
-		}
+		upp(v.Mul(*v.RotateZ(&g.p.Dir, math.Pi/2), g.p.ms*dt))
 	}
 
 	// Rotation
@@ -145,7 +133,6 @@ func (g *game) Update() error {
 	return nil
 }
 func (g *game) Draw(screen *ebiten.Image) {
-
 	drawLine := func(a, b v.Vec, clr color.Color) {
 		ebitenutil.DrawLine(screen, a.X, a.Y, b.X, b.Y, clr)
 	}
@@ -161,7 +148,6 @@ func (g *game) Draw(screen *ebiten.Image) {
 
 	// Player
 	h := v.Mul(g.p.Dir, float64(g.p.h))
-	drawLine(g.p.Pos, v.Add(g.p.Pos, h), color.RGBA{124, 252, 0, 255})
 
 	// Rays
 	r := v.Mul(*v.RotateZ(&g.p.Dir, math.Pi/2), float64(g.p.a)/2)
