@@ -17,14 +17,6 @@ const (
 	cw, ch = float64(sw) / mw, float64(sh) / mh // cell width/height
 )
 
-func rtg(a float64) int { // Round to greatest
-	if i := int(a); float64(i) < a {
-		return i + 1
-	} else {
-		return i
-	}
-}
-
 type Pair[T, U any] struct {
 	X T
 	Y U
@@ -109,26 +101,37 @@ func (g *game) Update() error {
 	g.prevFrameTime = time.Now().UnixMilli()
 
 	// Movement:
-	in := Pair[int, int]{rtg(g.p.Pos.X / cw), rtg(g.p.Pos.Y / ch)} // pos = in * sqw => in = pos/sqw
 
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
-		if g.maze[in.Y-1][in.X] == 0 {
-			g.p.Pos.Y -= g.p.ms * dt
+		np := g.p.Pos // np - new pos
+		np.Y -= g.p.ms * dt
+		in := Pair[int, int]{int(np.X / cw), int(np.Y / ch)}
+		if g.maze[in.Y][in.X] == 0 {
+			g.p.Pos = np
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		if g.maze[in.Y+1][in.X] == 0 {
-			g.p.Pos.Y += g.p.ms * dt
+		np := g.p.Pos // np - new pos
+		np.Y += g.p.ms * dt
+		in := Pair[int, int]{int(np.X / cw), int(np.Y / ch)}
+		if g.maze[in.Y][in.X] == 0 {
+			g.p.Pos = np
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		if g.maze[in.Y][in.X-1] == 0 {
-			g.p.Pos.X -= g.p.ms * dt
+		np := g.p.Pos // np - new pos
+		np.X -= g.p.ms * dt
+		in := Pair[int, int]{int(np.X / cw), int(np.Y / ch)}
+		if g.maze[in.Y][in.X] == 0 {
+			g.p.Pos = np
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		if g.maze[in.Y][in.X+1] == 0 {
-			g.p.Pos.X += g.p.ms * dt
+		np := g.p.Pos // np - new pos
+		np.X += g.p.ms * dt
+		in := Pair[int, int]{int(np.X / cw), int(np.Y / ch)}
+		if g.maze[in.Y][in.X] == 0 {
+			g.p.Pos = np
 		}
 	}
 
@@ -157,10 +160,8 @@ func (g *game) Draw(screen *ebiten.Image) {
 	}
 
 	// Player
-	in := Pair[int, int]{rtg(g.p.Pos.X / cw), rtg(g.p.Pos.Y / ch)}  // pos = in * sqw => in = pos/sqw
-	p := v.Vec{cw*float64(in.X) + cw/2, ch*float64(in.Y) + ch/2, 0} // Pos of Player's Cell center
 	h := v.Mul(g.p.Dir, float64(g.p.h))
-	drawLine(p, v.Add(p, h), color.RGBA{124, 252, 0, 255})
+	drawLine(g.p.Pos, v.Add(g.p.Pos, h), color.RGBA{124, 252, 0, 255})
 
 	// Rays
 	r := v.Mul(*v.RotateZ(&g.p.Dir, math.Pi/2), float64(g.p.a)/2)
@@ -169,8 +170,8 @@ func (g *game) Draw(screen *ebiten.Image) {
 	for i := 0; i < g.rc; i++ {
 		ak := v.Mul(v.Div(ab, float64(g.rc)), float64(i))
 		pk := v.Add(pa, ak)
-		k := v.Add(p, pk)
-		drawLine(p, k, color.RGBA{255, 255, 0, 255})
+		k := v.Add(g.p.Pos, pk)
+		drawLine(g.p.Pos, k, color.RGBA{255, 255, 0, 255})
 	}
 }
 
