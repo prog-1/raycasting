@@ -53,32 +53,23 @@ func (g *Game) Update() error {
 	//Player WASD Movement
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
 		//collision handling
-		if g.gameMap[int((g.playerPos.y-colDis-g.mapPos.y)/cellSize)][int((g.playerPos.x-g.mapPos.x)/cellSize)] == 0 { //if in cell of player pos + colDis is air, not cell
-			//g.playerPos.y--
-			g.playerPos = add(g.playerPos, divide(g.viewDir, viewLen))
-			//adding viewDir to playerPos to move forward
-			//dividing viewDir to gain unit vector
+		if nextPos := add(g.playerPos, divide(g.viewDir, viewLen)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 { //if next position of the player is not the wall
+			g.playerPos = nextPos
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		//collision handling
-		if g.gameMap[int((g.playerPos.y+colDis-g.mapPos.y)/cellSize)][int((g.playerPos.x-g.mapPos.x)/cellSize)] == 0 {
-			//g.playerPos.y++
-			g.playerPos = subtract(g.playerPos, divide(g.viewDir, viewLen)) //same as W, but subtracting viewDir
+		if nextPos := subtract(g.playerPos, divide(g.viewDir, viewLen)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 {
+			g.playerPos = nextPos //same as W, but subtracting viewDir
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		//collision handling
-		if g.gameMap[int((g.playerPos.y-g.mapPos.y)/cellSize)][int((g.playerPos.x-colDis-g.mapPos.x)/cellSize)] == 0 {
-			//g.playerPos.x--
-			g.playerPos = add(g.playerPos, rotate(divide(g.viewDir, viewLen), -math.Pi/2)) //rotating on 90 before adding
+		if nextPos := add(g.playerPos, rotate(divide(g.viewDir, viewLen), -math.Pi/2)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 {
+			g.playerPos = nextPos //rotating on 90 before adding
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		//collision handling
-		if g.gameMap[int((g.playerPos.y-g.mapPos.y)/cellSize)][int((g.playerPos.x+colDis-g.mapPos.x)/cellSize)] == 0 {
-			//g.playerPos.x++
-			g.playerPos = add(g.playerPos, rotate(divide(g.viewDir, viewLen), math.Pi/2)) //rotating on -90 before adding
+		if nextPos := add(g.playerPos, rotate(divide(g.viewDir, viewLen), math.Pi/2)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 {
+			g.playerPos = nextPos //rotating on -90 before adding
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) {
@@ -164,6 +155,12 @@ func subtract(a, b vector) (res vector) {
 func add(a, b vector) (res vector) {
 	res.x = a.x + b.x
 	res.y = a.y + b.y
+	return res
+}
+
+func multiply(a vector, v float64) (res vector) { //v - value
+	res.x = a.x / v
+	res.y = a.y / v
 	return res
 }
 
