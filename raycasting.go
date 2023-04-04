@@ -25,7 +25,7 @@ const (
 	viewLen  = 150  //lenght of player view and camera plane lines
 	//if len of viewDir = len of camPlane, then FoV = 90 degrees
 	segNumber = 100 // number of segments of camera plane line for rays
-	colDis    = 10  //player collision distance
+	playerCol = 10  //player collision size
 )
 
 type Game struct {
@@ -53,23 +53,25 @@ func (g *Game) Update() error {
 	//Player WASD Movement
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
 		//collision handling
-		if nextPos := add(g.playerPos, divide(g.viewDir, viewLen)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 { //if next position of the player is not the wall
-			g.playerPos = nextPos
+		if nextPos := add(g.playerPos, divide(g.viewDir, viewLen/playerCol)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 { //if next position of the player is not the wall
+			g.playerPos = add(g.playerPos, divide(g.viewDir, viewLen))
+			//adding viewDir to playerPos to move forward
+			//dividing viewDir to gain unit vector
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		if nextPos := subtract(g.playerPos, divide(g.viewDir, viewLen)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 {
-			g.playerPos = nextPos //same as W, but subtracting viewDir
+		if nextPos := subtract(g.playerPos, divide(g.viewDir, viewLen/playerCol)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 {
+			g.playerPos = subtract(g.playerPos, divide(g.viewDir, viewLen)) //same as W, but subtracting viewDir
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		if nextPos := add(g.playerPos, rotate(divide(g.viewDir, viewLen), -math.Pi/2)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 {
-			g.playerPos = nextPos //rotating on 90 before adding
+		if nextPos := add(g.playerPos, rotate(divide(g.viewDir, viewLen/playerCol), -math.Pi/2)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 {
+			g.playerPos = add(g.playerPos, rotate(divide(g.viewDir, viewLen), -math.Pi/2)) //rotating on 90 before adding
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		if nextPos := add(g.playerPos, rotate(divide(g.viewDir, viewLen), math.Pi/2)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 {
-			g.playerPos = nextPos //rotating on -90 before adding
+		if nextPos := add(g.playerPos, rotate(divide(g.viewDir, viewLen/playerCol), math.Pi/2)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 {
+			g.playerPos = add(g.playerPos, rotate(divide(g.viewDir, viewLen), math.Pi/2)) //rotating on -90 before adding
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) {
@@ -106,7 +108,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	//Draw player
-	ebitenutil.DrawCircle(screen, g.playerPos.x, g.playerPos.y, 10, color.RGBA{100, 180, 255, 255} /*Light blue*/)
+	ebitenutil.DrawCircle(screen, g.playerPos.x, g.playerPos.y, playerCol, color.RGBA{100, 180, 255, 255} /*Light blue*/)
 
 	//# FIELD OF VIEW #
 
