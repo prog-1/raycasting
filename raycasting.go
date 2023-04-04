@@ -25,6 +25,7 @@ const (
 	viewLen  = 150  //lenght of player view and camera plane lines
 	//if len of viewDir = len of camPlane, then FoV = 90 degrees
 	segNumber = 100 // number of segments of camera plane line for rays
+	colDis    = 10  //player collision distance
 )
 
 type Game struct {
@@ -33,8 +34,7 @@ type Game struct {
 	gameMap   [][]int //game map 2d matrix
 	mapPos    vector  //map position on the screen (top left corner)
 	playerPos vector  //player position
-	playerDir vector  //player view direction
-	//camPlane  line    // camera plane(screen)
+	viewDir   vector  //player view direction
 }
 
 //line with start & end points
@@ -53,34 +53,39 @@ func (g *Game) Update() error {
 	//Player WASD Movement
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
 		//collision handling
-		if g.gameMap[int((g.playerPos.y-1-g.mapPos.y)/cellSize)][int((g.playerPos.x-g.mapPos.x)/cellSize)] == 0 {
-			g.playerPos.y--
-
+		if g.gameMap[int((g.playerPos.y-colDis-g.mapPos.y)/cellSize)][int((g.playerPos.x-g.mapPos.x)/cellSize)] == 0 { //if in cell of player pos + colDis is air, not cell
+			//g.playerPos.y--
+			g.playerPos = add(g.playerPos, divide(g.viewDir, viewLen))
+			//adding viewDir to playerPos to move forward
+			//dividing viewDir to gain unit vector
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
 		//collision handling
-		if g.gameMap[int((g.playerPos.y+1-g.mapPos.y)/cellSize)][int((g.playerPos.x-g.mapPos.x)/cellSize)] == 0 {
-			g.playerPos.y++
+		if g.gameMap[int((g.playerPos.y+colDis-g.mapPos.y)/cellSize)][int((g.playerPos.x-g.mapPos.x)/cellSize)] == 0 {
+			//g.playerPos.y++
+			g.playerPos = subtract(g.playerPos, divide(g.viewDir, viewLen)) //same as W, but subtracting viewDir
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
 		//collision handling
-		if g.gameMap[int((g.playerPos.y-g.mapPos.y)/cellSize)][int((g.playerPos.x-1-g.mapPos.x)/cellSize)] == 0 {
-			g.playerPos.x--
+		if g.gameMap[int((g.playerPos.y-g.mapPos.y)/cellSize)][int((g.playerPos.x-colDis-g.mapPos.x)/cellSize)] == 0 {
+			//g.playerPos.x--
+			g.playerPos = add(g.playerPos, rotate(divide(g.viewDir, viewLen), -math.Pi/2)) //rotating on 90 before adding
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
 		//collision handling
-		if g.gameMap[int((g.playerPos.y-g.mapPos.y)/cellSize)][int((g.playerPos.x+1-g.mapPos.x)/cellSize)] == 0 {
-			g.playerPos.x++
+		if g.gameMap[int((g.playerPos.y-g.mapPos.y)/cellSize)][int((g.playerPos.x+colDis-g.mapPos.x)/cellSize)] == 0 {
+			//g.playerPos.x++
+			g.playerPos = add(g.playerPos, rotate(divide(g.viewDir, viewLen), math.Pi/2)) //rotating on -90 before adding
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) {
-		g.playerDir = rotate(g.playerDir, -math.Pi/200)
+		g.viewDir = rotate(g.viewDir, -math.Pi/200)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyArrowRight) {
-		g.playerDir = rotate(g.playerDir, math.Pi/200)
+		g.viewDir = rotate(g.viewDir, math.Pi/200)
 	}
 
 	return nil
@@ -114,9 +119,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	//# FIELD OF VIEW #
 
-	camA := add(g.playerDir, rotate(g.playerDir, -math.Pi/2)) //first camera point
-	camB := add(g.playerDir, rotate(g.playerDir, math.Pi/2))  //last camera point
-	camPlane := line{camA, camB}                              //camera plane line
+	camA := add(g.viewDir, rotate(g.viewDir, -math.Pi/2)) //first camera point
+	camB := add(g.viewDir, rotate(g.viewDir, math.Pi/2))  //last camera point
+	camPlane := line{camA, camB}                          //camera plane line
 
 	//# Ray Drawing #
 	//segment length for each projection
@@ -128,7 +133,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	//player view line drawing
-	ebitenutil.DrawLine(screen, g.playerPos.x, g.playerPos.y, g.playerPos.x+g.playerDir.x, g.playerPos.y+g.playerDir.y, color.RGBA{255, 146, 28, 200} /*Orange*/)
+	ebitenutil.DrawLine(screen, g.playerPos.x, g.playerPos.y, g.playerPos.x+g.viewDir.x, g.playerPos.y+g.viewDir.y, color.RGBA{255, 146, 28, 200} /*Orange*/)
 
 	//camera plane line drawing
 	ebitenutil.DrawLine(screen, g.playerPos.x+camPlane.a.x, g.playerPos.y+camPlane.a.y, g.playerPos.x+camPlane.b.x, g.playerPos.y+camPlane.b.y, color.RGBA{132, 132, 255, 200} /*Blue*/)
@@ -159,6 +164,12 @@ func subtract(a, b vector) (res vector) {
 func add(a, b vector) (res vector) {
 	res.x = a.x + b.x
 	res.y = a.y + b.y
+	return res
+}
+
+func divide(a vector, v float64) (res vector) { //v - value
+	res.x = a.x / v
+	res.y = a.y / v
 	return res
 }
 
@@ -225,9 +236,7 @@ func NewGame(width, height int) *Game {
 
 	mapPos := vector{(sW / 2) - (mW / 2), (sH / 2) - (mH / 2)} // map position
 	playerStartPos := vector{sW / 2, sH / 2}                   //player initial position
+	playerDir := vector{0, -viewLen}                           //player view direction
 
-	playerDir := vector{0, -viewLen} //player view direction
-	//camPlane := line{vector{playerDir.x - viewLen, playerDir.y}, vector{playerDir.x + viewLen, playerDir.y}} //camera plane line
-
-	return &Game{width: width, height: height, gameMap: initGameMap(), mapPos: mapPos, playerPos: playerStartPos, playerDir: playerDir /*camPlane: camPlane*/}
+	return &Game{width: width, height: height, gameMap: initGameMap(), mapPos: mapPos, playerPos: playerStartPos, viewDir: playerDir /*camPlane: camPlane*/}
 }
