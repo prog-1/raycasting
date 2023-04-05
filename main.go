@@ -133,8 +133,10 @@ func DrawMap(img *ebiten.Image, pos, dir Point) {
 		}
 	}
 	ebitenutil.DrawCircle(img, pos.x, pos.y, 3, color.White)
-	for i := -30; i <= 30; i++ {
-		ray := Point{dir.x*math.Cos(float64(i)*math.Pi/180) - dir.y*math.Sin(float64(i)*math.Pi/180), dir.x*math.Sin(float64(i)*math.Pi/180) + dir.y*math.Cos(float64(i)*math.Pi/180)}
+	// 320 rays for 60 degrees
+	startdir := Point{dir.x*math.Cos(-math.Pi/6) - dir.y*math.Sin(-math.Pi/6), dir.x*math.Sin(-math.Pi/6) + dir.y*math.Cos(-math.Pi/6)}
+	for i := 0; i <= 319; i++ {
+		ray := Point{startdir.x*math.Cos(float64(i)*60/320*math.Pi/180) - startdir.y*math.Sin(float64(i)*60/320*math.Pi/180), startdir.x*math.Sin(float64(i)*60/320*math.Pi/180) + startdir.y*math.Cos(float64(i)*60/320*math.Pi/180)}
 		d := Point{pos.x + ray.x, pos.y + ray.y}
 		for ; Map[int(d.y/15)][int(d.x/15)] == 0; d.x, d.y = d.x+ray.x, d.y+ray.y {
 		}
