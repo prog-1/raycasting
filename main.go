@@ -77,27 +77,21 @@ func rotate(p *Point, angle float64) {
 }
 
 func (g *Game) Update() error {
-	var mult float64
-	if worldMap[int(g.pos.y)][int(g.pos.x)] == 0 {
-		mult = 1
-	} else {
-		mult = -1
+	if ebiten.IsKeyPressed(ebiten.KeyW) && worldMap[int(g.pos.y+g.dir.y/10)][int(g.pos.x+g.dir.x/10)] == 0 {
+		g.pos.x += g.dir.x / 10
+		g.pos.y += g.dir.y / 10
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyW) {
-		g.pos.x += g.dir.x / 10 * mult
-		g.pos.y += g.dir.y / 10 * mult
+	if ebiten.IsKeyPressed(ebiten.KeyS) && worldMap[int(g.pos.y-g.dir.y/10)][int(g.pos.x-g.dir.x/10)] == 0 {
+		g.pos.x -= g.dir.x / 10
+		g.pos.y -= g.dir.y / 10
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		g.pos.x -= g.dir.x / 10 * mult
-		g.pos.y -= g.dir.y / 10 * mult
+	if ebiten.IsKeyPressed(ebiten.KeyA) && worldMap[int(g.pos.y-g.dir.x/10)][int(g.pos.x+g.dir.y/10)] == 0 {
+		g.pos.x += g.dir.y / 10
+		g.pos.y -= g.dir.x / 10
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		g.pos.x += g.dir.y / 10 * mult
-		g.pos.y -= g.dir.x / 10 * mult
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		g.pos.x -= g.dir.y / 10 * mult
-		g.pos.y += g.dir.x / 10 * mult
+	if ebiten.IsKeyPressed(ebiten.KeyD) && worldMap[int(g.pos.y+g.dir.x/10)][int(g.pos.x-g.dir.y/10)] == 0 {
+		g.pos.x -= g.dir.y / 10
+		g.pos.y += g.dir.x / 10
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) {
 		rotate(g.dir, -math.Pi/180)
@@ -109,6 +103,55 @@ func (g *Game) Update() error {
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
+	for i := 0; i < g.width; i++ {
+		cameraX := 2*float64(i)/float64(g.width) - 1
+		rayDir := Point{g.dir.x + g.plane.x*cameraX, g.dir.y + g.plane.y*cameraX}
+		p := Point{g.pos.x, g.pos.y}
+		deltaDist := Point{math.Abs(1 / rayDir.x), math.Abs(1 / rayDir.y)}
+		var sideDist, step Point
+		var perpWallDist float64
+		var side int
+		if rayDir.x < 0 {
+			step.x = -1
+			sideDist.x = (g.pos.x - p.x) * deltaDist.x
+		} else {
+			step.x = 1
+			sideDist.x = (p.x + 1.0 - g.pos.x) * deltaDist.x
+		}
+		if rayDir.y < 0 {
+			step.y = -1
+			sideDist.y = (g.pos.y - p.y) * deltaDist.y
+		} else {
+			step.y = 1
+			sideDist.y = (p.y + 1.0 - g.pos.y) * deltaDist.y
+		}
+		for worldMap[int(p.y)][int(p.x)] == 0 {
+			if sideDist.x < sideDist.y {
+				sideDist.x += deltaDist.x
+				p.x += step.x
+				side = 0
+			} else {
+				sideDist.y += deltaDist.y
+				p.y += step.y
+				side = 1
+			}
+		}
+		if side == 0 {
+			perpWallDist = sideDist.x - deltaDist.x
+		} else {
+			perpWallDist = sideDist.y - deltaDist.y
+		}
+		lineHeight := int(float64(g.height) / perpWallDist)
+		drawStart := -lineHeight/2 + g.height/2
+		if drawStart < 0 {
+			drawStart = 0
+		}
+		drawEnd := lineHeight/2 + g.height/2
+		if drawEnd >= g.height {
+			drawEnd = g.height - 1
+		}
+		vector.StrokeLine(screen, float32(i), float32(drawStart), float32(i), float32(drawEnd), 3, clr[worldMap[int(p.y)][int(p.x)]-1], false)
+	}
 	for i := range worldMap {
 		for j := range worldMap[i] {
 			if worldMap[j][i] != 0 {
