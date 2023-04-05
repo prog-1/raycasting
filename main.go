@@ -56,22 +56,22 @@ var Map = [][]int{
 // NewPlayer initializes and returns a new Player instance.
 func NewPlayer() *Player {
 	return &Player{
-		pos: Point{15 * 12, 15*23 - 8},
+		pos: Point{15 * 12, 15 * 23},
 		dir: Point{0, -1},
 	}
 }
 
 func (p *Player) Update() {
-	if ebiten.IsKeyPressed(ebiten.KeyW) && Map[int(p.pos.y+8*p.dir.y)/15][int(p.pos.x+8*p.dir.x)/15] == 0 {
+	if ebiten.IsKeyPressed(ebiten.KeyW) && Map[int(p.pos.y+p.dir.y)/15][int(p.pos.x+p.dir.x)/15] == 0 {
 		p.pos.x, p.pos.y = p.pos.x+p.dir.x, p.pos.y+p.dir.y
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyS) && Map[int(p.pos.y-8*p.dir.y)/15][int(p.pos.x-8*p.dir.x)/15] == 0 {
+	if ebiten.IsKeyPressed(ebiten.KeyS) && Map[int(p.pos.y-p.dir.y)/15][int(p.pos.x-p.dir.x)/15] == 0 {
 		p.pos.x, p.pos.y = p.pos.x-p.dir.x, p.pos.y-p.dir.y
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyD) && Map[int(p.pos.y+8*(p.dir.x*math.Sin(math.Pi/2)+p.dir.y*math.Cos(math.Pi/2)))/15][int(p.pos.x+8*(p.dir.x*math.Cos(math.Pi/2)-p.dir.y*math.Sin(math.Pi/2)))/15] == 0 {
+	if ebiten.IsKeyPressed(ebiten.KeyD) && Map[int(p.pos.y+p.dir.x*math.Sin(math.Pi/2)+p.dir.y*math.Cos(math.Pi/2))/15][int(p.pos.x+p.dir.x*math.Cos(math.Pi/2)-p.dir.y*math.Sin(math.Pi/2))/15] == 0 {
 		p.pos.x, p.pos.y = p.pos.x+p.dir.x*math.Cos(math.Pi/2)-p.dir.y*math.Sin(math.Pi/2), p.pos.y+p.dir.x*math.Sin(math.Pi/2)+p.dir.y*math.Cos(math.Pi/2)
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyA) && Map[int(p.pos.y+8*(p.dir.x*math.Sin(-math.Pi/2)+p.dir.y*math.Cos(-math.Pi/2)))/15][int(p.pos.x+8*(p.dir.x*math.Cos(-math.Pi/2)-p.dir.y*math.Sin(-math.Pi/2)))/15] == 0 {
+	if ebiten.IsKeyPressed(ebiten.KeyA) && Map[int(p.pos.y+p.dir.x*math.Sin(-math.Pi/2)+p.dir.y*math.Cos(-math.Pi/2))/15][int(p.pos.x+p.dir.x*math.Cos(-math.Pi/2)-p.dir.y*math.Sin(-math.Pi/2))/15] == 0 {
 		p.pos.x, p.pos.y = p.pos.x+p.dir.x*math.Cos(-math.Pi/2)-p.dir.y*math.Sin(-math.Pi/2), p.pos.y+p.dir.x*math.Sin(-math.Pi/2)+p.dir.y*math.Cos(-math.Pi/2)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyArrowRight) {
@@ -132,7 +132,7 @@ func DrawMap(img *ebiten.Image, pos, dir Point) {
 			ebitenutil.DrawRect(img, float64(15*j), float64(15*i), 15, 15, c)
 		}
 	}
-	ebitenutil.DrawCircle(img, pos.x, pos.y, 8, color.White)
+	ebitenutil.DrawCircle(img, pos.x, pos.y, 3, color.White)
 	for i := -30; i <= 30; i++ {
 		ray := Point{dir.x*math.Cos(float64(i)*math.Pi/180) - dir.y*math.Sin(float64(i)*math.Pi/180), dir.x*math.Sin(float64(i)*math.Pi/180) + dir.y*math.Cos(float64(i)*math.Pi/180)}
 		d := Point{pos.x + ray.x, pos.y + ray.y}
