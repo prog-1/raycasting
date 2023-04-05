@@ -16,29 +16,23 @@ const (
 	dpi          = 100
 )
 
-var c = color.RGBA{R: 255, G: 255, B: 255, A: 255}
-
 type (
 	point struct {
 		x, y float64
 	}
 	game struct {
-		m      *ebiten.Image
-		p      point
-		pg     [][]int
-		lp, rp point
+		m  *ebiten.Image
+		p  point
+		pg [][]int
+		lp point
 	}
 )
 
-func rotate(p *point, b bool) {
-	x, y := p.x, p.y
-	if b {
-		p.x = x*math.Cos(math.Pi/200) - y*math.Sin(math.Pi/200)
-		p.y = x*math.Sin(math.Pi/200) + y*math.Cos(math.Pi/200)
-	} else {
-		p.x = x*math.Cos(-math.Pi/200) - y*math.Sin(-math.Pi/200)
-		p.y = x*math.Sin(-math.Pi/200) + y*math.Cos(-math.Pi/200)
-	}
+func rotate(p *point, angle float64) {
+	x, y := p.x-500, p.y-500
+
+	p.x = (x*math.Cos(angle) - y*math.Sin(angle)) + 500
+	p.y = (x*math.Sin(angle) + y*math.Cos(angle)) + 500
 
 }
 
@@ -47,12 +41,11 @@ func (g *game) Layout(outWidth, outHeight int) (w, h int) { return screenWidth, 
 func (g *game) Update() error {
 
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		rotate(&g.lp, true)
-		rotate(&g.rp, true)
+		rotate(&g.lp, math.Pi/200)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		rotate(&g.lp, false)
-		rotate(&g.rp, false)
+		rotate(&g.lp, -math.Pi/200)
+
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyArrowDown) {
 		if g.pg[((int(g.p.y)+500-38)/50)+1][int(g.p.x+500)/50] == 0 {
@@ -84,10 +77,10 @@ func (g *game) Draw(screen *ebiten.Image) {
 	screen.DrawImage(g.m, op)
 	ebitenutil.DrawCircle(screen, screenWidth/2, screenHeight/2, 10, color.RGBA{0xff, 0xff, 0x00, 0xff})
 	pnt := g.lp
-	diff := g.rp.x - g.lp.x
-	for pnt.x <= g.rp.x {
-		ebitenutil.DrawLine(screen, screenWidth/2, screenHeight/2, pnt.x+screenWidth/2, pnt.y+screenHeight/2, color.RGBA{0xff, 0xff, 0x00, 0xff})
-		pnt.x += diff * 0.01
+	// diff := point{g.rp.x - g.lp.x, g.rp.y - g.lp.y}
+	for i := 0; i < 180; i++ {
+		ebitenutil.DrawLine(screen, screenWidth/2, screenHeight/2, pnt.x, pnt.y, color.RGBA{0xff, 0xff, 0x00, 0xff})
+		rotate(&pnt, math.Pi/360)
 	}
 
 }
@@ -148,7 +141,7 @@ func NewGame() *game {
 		m:  DrawBackground(ebiten.NewImage(screenWidth, screenHeight), pg),
 		p:  point{0, 0},
 		pg: pg,
-		lp: point{-200, 200},
-		rp: point{200, 200},
+		lp: point{300, 700},
+		// rp: point{700, 300},
 	}
 }
