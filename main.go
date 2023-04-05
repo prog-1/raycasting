@@ -3,6 +3,8 @@ package main
 import (
 	"image/color"
 	"log"
+	"math"
+	"os"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
@@ -22,9 +24,6 @@ type Point struct {
 type Player struct {
 	pos Point
 	dir Point
-}
-
-type Maze struct {
 }
 
 var Map = [][]int{
@@ -55,30 +54,41 @@ var Map = [][]int{
 }
 
 // NewPlayer initializes and returns a new Player instance.
-func NewPlayer(x, y float64) *Player {
+func NewPlayer() *Player {
 	return &Player{
-		pos: Point{x, y},
+		pos: Point{15 * 12, 15*23 - 8},
+		dir: Point{0, -1},
 	}
 }
 
 func (p *Player) Update() {
-	if ebiten.IsKeyPressed(ebiten.KeyArrowUp) && p.pos.y > 15+8 {
-		p.pos.y -= 1
+	if ebiten.IsKeyPressed(ebiten.KeyW) && Map[int(p.pos.y+8*p.dir.y)/15][int(p.pos.x+8*p.dir.x)/15] == 0 {
+		p.pos.x, p.pos.y = p.pos.x+p.dir.x, p.pos.y+p.dir.y
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyArrowDown) && p.pos.y < 15*23-8 {
-		p.pos.y += 1
+	if ebiten.IsKeyPressed(ebiten.KeyS) && Map[int(p.pos.y-8*p.dir.y)/15][int(p.pos.x-8*p.dir.x)/15] == 0 {
+		p.pos.x, p.pos.y = p.pos.x-p.dir.x, p.pos.y-p.dir.y
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyD) && Map[int(p.pos.y+8*(p.dir.x*math.Sin(math.Pi/2)+p.dir.y*math.Cos(math.Pi/2)))/15][int(p.pos.x+8*(p.dir.x*math.Cos(math.Pi/2)-p.dir.y*math.Sin(math.Pi/2)))/15] == 0 {
+		p.pos.x, p.pos.y = p.pos.x+p.dir.x*math.Cos(math.Pi/2)-p.dir.y*math.Sin(math.Pi/2), p.pos.y+p.dir.x*math.Sin(math.Pi/2)+p.dir.y*math.Cos(math.Pi/2)
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyA) && Map[int(p.pos.y+8*(p.dir.x*math.Sin(-math.Pi/2)+p.dir.y*math.Cos(-math.Pi/2)))/15][int(p.pos.x+8*(p.dir.x*math.Cos(-math.Pi/2)-p.dir.y*math.Sin(-math.Pi/2)))/15] == 0 {
+		p.pos.x, p.pos.y = p.pos.x+p.dir.x*math.Cos(-math.Pi/2)-p.dir.y*math.Sin(-math.Pi/2), p.pos.y+p.dir.x*math.Sin(-math.Pi/2)+p.dir.y*math.Cos(-math.Pi/2)
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyArrowRight) {
+		p.dir.x, p.dir.y = p.dir.x*math.Cos(math.Pi/180)-p.dir.y*math.Sin(math.Pi/180), p.dir.x*math.Sin(math.Pi/180)+p.dir.y*math.Cos(math.Pi/180)
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) {
+		p.dir.x, p.dir.y = p.dir.x*math.Cos(-math.Pi/180)-p.dir.y*math.Sin(-math.Pi/180), p.dir.x*math.Sin(-math.Pi/180)+p.dir.y*math.Cos(-math.Pi/180)
 	}
 }
 
 func (p *Player) Draw(screen *ebiten.Image) {
-
 }
 
 // Game is a game instance.
 type Game struct {
 	width, height int
 	Player        *Player
-	Maze          *Maze
 	mapIsOpen     bool
 }
 
@@ -87,7 +97,7 @@ func NewGame(width, height int) *Game {
 	return &Game{
 		width:  width,
 		height: height,
-		Player: NewPlayer(15*12, 15*23-8),
+		Player: NewPlayer(),
 	}
 }
 
@@ -97,11 +107,14 @@ func (g *Game) Layout(outWidth, outHeight int) (w, h int) {
 
 // Update updates a game state.
 func (g *Game) Update() error {
+	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
+		os.Exit(0)
+	}
 	g.Player.Update()
 	return nil
 }
 
-func DrawMap(img *ebiten.Image, pos Point) {
+func DrawMap(img *ebiten.Image, pos, dir Point) {
 	for i := range Map {
 		for j := range Map[i] {
 			c := color.RGBA{}
@@ -113,11 +126,20 @@ func DrawMap(img *ebiten.Image, pos Point) {
 				c = color.RGBA{0x0A, 0x51, 0x0C, 0xff}
 			} else if Map[i][j] == 4 {
 				c = color.RGBA{0x78, 0x0A, 0x0A, 0xff}
+			} else if Map[i][j] == 5 {
+				c = color.RGBA{0x96, 0x1E, 0x62, 0xff}
 			}
-			ebitenutil.DrawRect(img, float64(15*i), float64(15*j), 15, 15, c)
+			ebitenutil.DrawRect(img, float64(15*j), float64(15*i), 15, 15, c)
 		}
 	}
 	ebitenutil.DrawCircle(img, pos.x, pos.y, 8, color.White)
+	for i := -30; i <= 30; i++ {
+		ray := Point{dir.x*math.Cos(float64(i)*math.Pi/180) - dir.y*math.Sin(float64(i)*math.Pi/180), dir.x*math.Sin(float64(i)*math.Pi/180) + dir.y*math.Cos(float64(i)*math.Pi/180)}
+		d := Point{pos.x + ray.x, pos.y + ray.y}
+		for ; Map[int(d.y/15)][int(d.x/15)] == 0; d.x, d.y = d.x+ray.x, d.y+ray.y {
+		}
+		ebitenutil.DrawLine(img, pos.x, pos.y, d.x, d.y, color.RGBA{0xf8, 0xf0, 0x00, 0xff})
+	}
 }
 
 // Draw renders a game screen.
@@ -128,7 +150,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		g.mapIsOpen = false
 	}
 	if g.mapIsOpen {
-		DrawMap(screen, g.Player.pos)
+		DrawMap(screen, g.Player.pos, g.Player.dir)
 	}
 	g.Player.Draw(screen)
 }
