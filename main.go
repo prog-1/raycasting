@@ -150,7 +150,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		if drawEnd >= g.height {
 			drawEnd = g.height - 1
 		}
-		vector.StrokeLine(screen, float32(i), float32(drawStart), float32(i), float32(drawEnd), 3, clr[worldMap[int(p.y)][int(p.x)]-1], false)
+		c := clr[worldMap[int(p.y)][int(p.x)]-1]
+		r, g, b, a := c.RGBA()
+		if side == 1 {
+			c = color.RGBA{uint8(float64(r>>8) * 0.3), uint8(float64(g>>8) * 0.3), uint8(float64(b>>8) * 0.3), uint8(float64(a >> 8))}
+		}
+		vector.StrokeLine(screen, float32(i), float32(drawStart), float32(i), float32(drawEnd), 3, c, false)
 	}
 	for i := range worldMap {
 		for j := range worldMap[i] {
