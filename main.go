@@ -3,11 +3,11 @@ package main
 import (
 	"image/color"
 	"log"
+	"math"
 	"math/rand"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
@@ -37,26 +37,37 @@ func sub(a, b Point) Point {
 	return Point{a.x - b.x, a.y - b.y, a.z - b.z}
 }
 
+func rotate(p *Point, angle float64) {
+	p.x = p.x*math.Cos(angle) - p.y*math.Sin(angle)
+	p.y = p.x*math.Sin(angle) + p.y*math.Cos(angle)
+}
+
 func (g *Game) Layout(outWidth, outHeight int) (w, h int) {
 	return g.width, g.height
 }
 
 func (g *Game) Update() error {
-	if ebiten.IsKeyPressed(ebiten.KeyW) && g.maze[int(g.player.y-1)/g.mazeScale][int(g.player.x)/g.mazeScale] == 0 {
-		g.player.y--
-		g.playerEyesDir.y--
+	if ebiten.IsKeyPressed(ebiten.KeyW) && g.maze[int(g.player.y+g.playerEyesDir.y)/g.mazeScale][int(g.player.x+g.playerEyesDir.x)/g.mazeScale] == 0 {
+		g.player.x = g.player.x + g.playerEyesDir.x
+		g.player.y = g.player.y + g.playerEyesDir.y
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyA) && g.maze[int(g.player.y)/g.mazeScale][int(g.player.x-1)/g.mazeScale] == 0 {
-		g.player.x--
-		g.playerEyesDir.x--
+	if ebiten.IsKeyPressed(ebiten.KeyA) && g.maze[int(g.player.y-g.playerEyesDir.y)/g.mazeScale][int(g.player.x+g.playerEyesDir.x)/g.mazeScale] == 0 {
+		g.player.x = g.player.x + g.playerEyesDir.x
+		g.player.y = g.player.y - g.playerEyesDir.y
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyS) && g.maze[int(g.player.y+1)/g.mazeScale][int(g.player.x)/g.mazeScale] == 0 {
-		g.player.y++
-		g.playerEyesDir.y++
+	if ebiten.IsKeyPressed(ebiten.KeyS) && g.maze[int(g.player.y-g.playerEyesDir.y)/g.mazeScale][int(g.player.x-g.playerEyesDir.x)/g.mazeScale] == 0 {
+		g.player.x = g.player.x - g.playerEyesDir.x
+		g.player.y = g.player.y - g.playerEyesDir.y
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyD) && g.maze[int(g.player.y)/g.mazeScale][int(g.player.x+1)/g.mazeScale] == 0 {
-		g.player.x++
-		g.playerEyesDir.x++
+	if ebiten.IsKeyPressed(ebiten.KeyD) && g.maze[int(g.player.y+g.playerEyesDir.y)/g.mazeScale][int(g.player.x-g.playerEyesDir.x)/g.mazeScale] == 0 {
+		g.player.x = g.player.x - g.playerEyesDir.x
+		g.player.y = g.player.y + g.playerEyesDir.y
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyQ) {
+		rotate(&g.playerEyesDir, math.Pi/60)
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyE) {
+		rotate(&g.playerEyesDir, math.Pi/-60)
 	}
 	return nil
 }
@@ -89,11 +100,14 @@ func (g *Game) DrawPlayer(screen *ebiten.Image) {
 
 func (g *Game) DrawFov(screen *ebiten.Image) {
 	a, b := sub(g.playerEyesDir, g.fov), sum(g.playerEyesDir, g.fov)
-	for n := 10; n > 0; n-- {
+	for i := 0; i < 100; i++ {
+		ray := Point{g.player.x, g.player.y, 0}
+		for int(ray.x) > 1*g.mazeScale && int(ray.x) < 9*g.mazeScale && int(ray.y) > 1*g.mazeScale && int(ray.y) < 9*g.mazeScale {
+			ray.x, ray.y = ray.x+a.x, ray.y+a.y
+		}
+		vector.StrokeLine(screen, float32(g.player.x), float32(g.player.y), float32(ray.x), float32(ray.y), 1, color.RGBA{255, 255, 0, 255}, false)
+		a.x, a.y = a.x+b.x/100, a.y+b.y/100
 	}
-	ebitenutil.DrawLine(screen, g.player.x, g.player.y, a.x, a.y, color.RGBA{255, 255, 0, 255})
-	ebitenutil.DrawLine(screen, g.player.x, g.player.y, b.x, b.y, color.RGBA{255, 255, 0, 255})
-
 }
 
 func NewGame(width, height int) *Game {
@@ -114,8 +128,8 @@ func NewGame(width, height int) *Game {
 		},
 		mazeScale:     25,
 		player:        Point{25, 25, 0},
-		playerEyesDir: Point{25, 0, 0},
-		fov:           Point{5, 0, 0},
+		playerEyesDir: Point{-1, 0, 0},
+		fov:           Point{0.2, 0.2, 0},
 	}
 }
 
