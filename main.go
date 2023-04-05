@@ -160,14 +160,36 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		}
 	}
 	vector.DrawFilledCircle(screen, float32(g.pos.x*cellSize), float32(g.pos.y*cellSize), 3, color.RGBA{255, 255, 0, 150}, false)
-	left, right := Point{g.dir.x - g.plane.x, g.dir.y - g.plane.y}, Point{g.dir.x + g.plane.x, g.dir.y + g.plane.y}
 	for i := 0.0; i < rayNum; i++ {
-		p := Point{g.pos.x, g.pos.y}
-		for p.x > 0 && p.x < 24 && p.y > 0 && p.y < 24 {
-			p.x, p.y = p.x+left.x, p.y+left.y
+		cameraX := 2*i/float64(rayNum) - 1
+		rayDir := Point{g.dir.x + g.plane.x*cameraX, g.dir.y + g.plane.y*cameraX}
+		p := Point{g.pos.x * cellSize, g.pos.y * cellSize}
+		deltaDist := Point{math.Abs(1 / rayDir.x), math.Abs(1 / rayDir.y)}
+		var sideDist, step Point
+		if rayDir.x < 0 {
+			step.x = -1
+			sideDist.x = (g.pos.x*cellSize - p.x) * deltaDist.x
+		} else {
+			step.x = 1
+			sideDist.x = (p.x + 1.0 - g.pos.x*cellSize) * deltaDist.x
 		}
-		vector.StrokeLine(screen, float32(g.pos.x*cellSize), float32(g.pos.y*cellSize), float32(p.x*cellSize), float32(p.y*cellSize), 3, color.RGBA{255, 255, 0, 50}, false)
-		left.x, left.y = left.x+right.x/rayNum, left.y+right.y/rayNum
+		if rayDir.y < 0 {
+			step.y = -1
+			sideDist.y = (g.pos.y*cellSize - p.y) * deltaDist.y
+		} else {
+			step.y = 1
+			sideDist.y = (p.y + 1.0 - g.pos.y*cellSize) * deltaDist.y
+		}
+		for worldMap[int(p.y)/cellSize][int(p.x)/cellSize] == 0 {
+			if sideDist.x < sideDist.y {
+				sideDist.x += deltaDist.x
+				p.x += step.x
+			} else {
+				sideDist.y += deltaDist.y
+				p.y += step.y
+			}
+		}
+		vector.StrokeLine(screen, float32(g.pos.x*cellSize), float32(g.pos.y*cellSize), float32(p.x), float32(p.y), 3, color.RGBA{255, 255, 0, 50}, false)
 	}
 }
 
