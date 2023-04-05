@@ -55,23 +55,23 @@ func (g *game) Update() error {
 		rotate(&g.rp, false)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyArrowDown) {
-		if g.pg[int(g.p.y)+1][int(g.p.x)] == 0 {
-			g.p.y++
+		if g.pg[((int(g.p.y)+500-38)/50)+1][int(g.p.x+500)/50] == 0 {
+			g.p.y += 5
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) {
-		if g.pg[int(g.p.y)][int(g.p.x)-1] == 0 {
-			g.p.x--
+		if g.pg[(int(g.p.y)+500)/50][int(g.p.x+500+38)/50-1] == 0 {
+			g.p.x -= 5
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyArrowRight) {
-		if g.pg[int(g.p.y)][int(g.p.x+1)] == 0 {
-			g.p.x++
+		if g.pg[(int(g.p.y)+500)/50][int(g.p.x+500-38)/50+1] == 0 {
+			g.p.x += 5
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyArrowUp) {
-		if g.pg[int(g.p.y)-1][int(g.p.x)] == 0 {
-			g.p.y--
+		if g.pg[(int(g.p.y+38)+500)/50-1][int(g.p.x+500)/50] == 0 {
+			g.p.y -= 5
 		}
 	}
 
@@ -79,12 +79,14 @@ func (g *game) Update() error {
 }
 
 func (g *game) Draw(screen *ebiten.Image) {
-	screen.DrawImage(g.m, nil)
-	ebitenutil.DrawCircle(screen, g.p.x*50+25, g.p.y*50+25, 10, color.RGBA{0xff, 0xff, 0x00, 0xff})
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Translate(-g.p.x, -g.p.y)
+	screen.DrawImage(g.m, op)
+	ebitenutil.DrawCircle(screen, screenWidth/2, screenHeight/2, 10, color.RGBA{0xff, 0xff, 0x00, 0xff})
 	pnt := g.lp
 	diff := g.rp.x - g.lp.x
 	for pnt.x <= g.rp.x {
-		ebitenutil.DrawLine(screen, g.p.x*50+25, g.p.y*50+25, pnt.x+g.p.x*50+25, pnt.y+g.p.y*50+25, color.RGBA{0xff, 0xff, 0x00, 0xff})
+		ebitenutil.DrawLine(screen, screenWidth/2, screenHeight/2, pnt.x+screenWidth/2, pnt.y+screenHeight/2, color.RGBA{0xff, 0xff, 0x00, 0xff})
 		pnt.x += diff * 0.01
 	}
 
@@ -144,7 +146,7 @@ func NewGame() *game {
 
 	return &game{
 		m:  DrawBackground(ebiten.NewImage(screenWidth, screenHeight), pg),
-		p:  point{5, 10},
+		p:  point{0, 0},
 		pg: pg,
 		lp: point{-200, 200},
 		rp: point{200, 200},
