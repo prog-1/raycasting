@@ -71,9 +71,11 @@ func (g *Game) Layout(outWidth, outHeight int) (w, h int) {
 	return g.width, g.height
 }
 
-func rotate(p *Point, angle float64) {
-	p.x = p.x*math.Cos(angle) - p.y*math.Sin(angle)
-	p.y = p.x*math.Sin(angle) + p.y*math.Cos(angle)
+func rotate(p *Point, angle float64) *Point {
+	res := new(Point)
+	res.x = p.x*math.Cos(angle) - p.y*math.Sin(angle)
+	res.y = p.x*math.Sin(angle) + p.y*math.Cos(angle)
+	return res
 }
 
 func (g *Game) Update() error {
@@ -94,10 +96,12 @@ func (g *Game) Update() error {
 		g.pos.y += g.dir.x / 10
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) {
-		rotate(g.dir, -math.Pi/180)
+		g.dir = rotate(g.dir, -math.Pi/180)
+		g.plane = rotate(g.plane, -math.Pi/180)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyArrowRight) {
-		rotate(g.dir, math.Pi/180)
+		g.dir = rotate(g.dir, math.Pi/180)
+		g.plane = rotate(g.plane, math.Pi/180)
 	}
 	return nil
 }
