@@ -17,12 +17,13 @@ const (
 )
 
 type Point struct {
-	x, y, z float64
+	x, y float64
 }
 
 type Game struct {
 	width, height int
 	maze          [][]int
+	wallColors 	map[int]color.RGBA
 	mazeScale     int
 	player        Point
 	playerEyesDir Point
@@ -30,16 +31,15 @@ type Game struct {
 }
 
 func sum(a, b Point) Point {
-	return Point{a.x + b.x, a.y + b.y, a.z + b.z}
+	return Point{a.x + b.x, a.y + b.y}
 }
 
 func sub(a, b Point) Point {
-	return Point{a.x - b.x, a.y - b.y, a.z - b.z}
+	return Point{a.x - b.x, a.y - b.y}
 }
 
-func rotate(p *Point, angle float64) {
-	p.x = p.x*math.Cos(angle) - p.y*math.Sin(angle)
-	p.y = p.x*math.Sin(angle) + p.y*math.Cos(angle)
+func rotate(p Point, angle float64) Point {
+	return Point{p.x*math.Cos(angle) - p.y*math.Sin(angle),  p.x*math.Sin(angle) + p.y*math.Cos(angle)}
 }
 
 func (g *Game) Layout(outWidth, outHeight int) (w, h int) {
@@ -64,10 +64,12 @@ func (g *Game) Update() error {
 		g.player.y = g.player.y + g.playerEyesDir.y
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyQ) {
-		rotate(&g.playerEyesDir, math.Pi/60)
+		g.playerEyesDir = rotate(g.playerEyesDir, math.Pi/60)
+		g.fov = rotate(g.fov, math.Pi/60)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyE) {
-		rotate(&g.playerEyesDir, math.Pi/-60)
+		g.playerEyesDir = rotate(g.playerEyesDir, math.Pi/-60)
+		g.fov = rotate(g.fov, math.Pi/-60)
 	}
 	return nil
 }
@@ -85,7 +87,7 @@ func (g *Game) DrawMinimap(screen *ebiten.Image) {
 	for i := range g.maze {
 		for _, j := range g.maze[i] {
 			if j > 0 {
-				vector.DrawFilledRect(screen, float32(x), float32(y), float32(g.mazeScale), float32(g.mazeScale), color.RGBA{128, 128, 128, 50}, false)
+				vector.DrawFilledRect(screen, float32(x), float32(y), float32(g.mazeScale), float32(g.mazeScale), g.wallColors[j], false)
 			}
 			x += g.mazeScale
 		}
@@ -101,8 +103,8 @@ func (g *Game) DrawPlayer(screen *ebiten.Image) {
 func (g *Game) DrawFov(screen *ebiten.Image) {
 	a, b := sub(g.playerEyesDir, g.fov), sum(g.playerEyesDir, g.fov)
 	for i := 0; i < 100; i++ {
-		ray := Point{g.player.x, g.player.y, 0}
-		for int(ray.x) > 1*g.mazeScale && int(ray.x) < 9*g.mazeScale && int(ray.y) > 1*g.mazeScale && int(ray.y) < 9*g.mazeScale {
+		ray := Point{g.player.x, g.player.y}
+		for g.maze[int((ray.y+a.y))/g.mazeScale][int((ray.x+a.x))/g.mazeScale] == 0{
 			ray.x, ray.y = ray.x+a.x, ray.y+a.y
 		}
 		vector.StrokeLine(screen, float32(g.player.x), float32(g.player.y), float32(ray.x), float32(ray.y), 1, color.RGBA{255, 255, 0, 255}, false)
@@ -115,21 +117,37 @@ func NewGame(width, height int) *Game {
 		width:  width,
 		height: height,
 		maze: [][]int{
-			{1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-			{1, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 1, 0, 0, 1, 1, 0, 0, 1},
-			{1, 0, 1, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 1, 0, 1, 0, 0, 1, 0, 1},
-			{1, 0, 1, 0, 0, 1, 1, 0, 0, 1},
-			{1, 0, 1, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 1, 1, 1, 0, 0, 0, 0, 1},
-			{1, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+			{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 2, 0, 0, 1},
+			{1, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 0, 0, 0, 1},
+			{1, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+			{1, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+			{1, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+			{1, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+			{1, 0, 3, 0, 3, 0, 3, 0, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 1},
+			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 1},
+			{1, 0, 3, 0, 3, 0, 3, 0, 0, 0, 0, 0, 0, 0, 4, 0, 4, 4, 4, 1},
+			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 4, 1},
+			{1, 0, 3, 0, 3, 0, 3, 0, 0, 0, 0, 0, 0, 0, 4, 4, 4, 4, 4, 1},
+			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+			{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 		},
-		mazeScale:     25,
-		player:        Point{25, 25, 0},
-		playerEyesDir: Point{-1, 0, 0},
-		fov:           Point{0.2, 0.2, 0},
+		wallColors: map[int]color.RGBA{
+			1: color.RGBA{255, 255, 255, 255},
+			2: color.RGBA{200, 10, 10, 255},
+			3: color.RGBA{10, 200, 10, 255},
+			4: color.RGBA{10, 10, 200, 255},
+		},
+		mazeScale:     15,
+		player:        Point{20, 20},
+		playerEyesDir: Point{-1, 0},
+		fov:           Point{0.3, 0.3},
 	}
 }
 
