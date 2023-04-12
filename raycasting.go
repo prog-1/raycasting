@@ -54,24 +54,25 @@ func (g *Game) Update() error {
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
 		//collision handling
 		if nextPos := add(g.playerPos, divide(g.viewDir, viewLen/playerCol)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 { //if next position of the player is not the wall
-			g.playerPos = add(g.playerPos, divide(g.viewDir, viewLen))
-			//adding viewDir to playerPos to move forward
-			//dividing viewDir to gain unit vector
+			//g.playerPos = add(g.playerPos, divide(g.viewDir, viewLen))
+			g.playerPos = add(g.playerPos, norm(g.viewDir))
+			//adding viewDir to playerPos to move forward on 1 pixel
+			//normalizing viewDir to gain unit vector
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
 		if nextPos := subtract(g.playerPos, divide(g.viewDir, viewLen/playerCol)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 {
-			g.playerPos = subtract(g.playerPos, divide(g.viewDir, viewLen)) //same as W, but subtracting viewDir
+			g.playerPos = subtract(g.playerPos, norm(g.viewDir)) //same as W, but subtracting viewDir
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
 		if nextPos := add(g.playerPos, rotate(divide(g.viewDir, viewLen/playerCol), -math.Pi/2)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 {
-			g.playerPos = add(g.playerPos, rotate(divide(g.viewDir, viewLen), -math.Pi/2)) //rotating on 90 before adding
+			g.playerPos = add(g.playerPos, rotate(norm(g.viewDir), -math.Pi/2)) //rotating on 90 before adding
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
 		if nextPos := add(g.playerPos, rotate(divide(g.viewDir, viewLen/playerCol), math.Pi/2)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 {
-			g.playerPos = add(g.playerPos, rotate(divide(g.viewDir, viewLen), math.Pi/2)) //rotating on -90 before adding
+			g.playerPos = add(g.playerPos, rotate(norm(g.viewDir), math.Pi/2)) //rotating on -90 before adding
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) {
@@ -122,18 +123,127 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	segLenY := (camPlane.b.y - camPlane.a.y) / segNumber
 
 	for i := 0.0; i <= segNumber; i++ { //for each segment
-		ebitenutil.DrawLine(screen, g.playerPos.x, g.playerPos.y, g.playerPos.x+(camPlane.a.x+(segLenX*i)), g.playerPos.y+(camPlane.a.y+(segLenY*i)), color.RGBA{242, 207, 85, 200} /*Yellow*/) //draw ray
+
+		var r vector //ray point on camPlane
+		r.x = (camPlane.a.x + (segLenX * i))
+		r.y = (camPlane.a.y + (segLenY * i))
+		r = norm(r) //ray unit vector
+
+		res := g.DDA(r)                                                                                                                               //calculate ray length
+		ebitenutil.DrawLine(screen, g.playerPos.x, g.playerPos.y, g.playerPos.x+res.x, g.playerPos.y+res.y, color.RGBA{242, 207, 85, 200} /*Yellow*/) //draw ray
 	}
+
+	//player's location in map
+	//fmt.Println(divide(subtract(g.playerPos, g.mapPos), cellSize))
 
 	//player view line drawing
 	ebitenutil.DrawLine(screen, g.playerPos.x, g.playerPos.y, g.playerPos.x+g.viewDir.x, g.playerPos.y+g.viewDir.y, color.RGBA{255, 146, 28, 200} /*Orange*/)
 
 	//camera plane line drawing
 	ebitenutil.DrawLine(screen, g.playerPos.x+camPlane.a.x, g.playerPos.y+camPlane.a.y, g.playerPos.x+camPlane.b.x, g.playerPos.y+camPlane.b.y, color.RGBA{132, 132, 255, 200} /*Blue*/)
+	//adding player position to convert from player coordinates to world coordinates
 
 }
 
 //-------------------------Functions----------------------------------
+
+//DDA - calculates length of the ray
+//inputs unit (direction) vector.
+//outputs vector in player's coord
+func (g Game) DDA(v vector) (res vector) {
+
+	initV := v
+
+	k := v.y / v.x
+
+	var signX, signY float64
+	if v.x < 0 { //if vector's x in player coord is negative
+		signX = -1
+	} else {
+		signX = 1
+	}
+	if v.y < 0 { //if vector's x in player coord is negative
+		signY = -1
+	} else {
+		signY = 1
+	}
+
+	pi := divide(subtract(g.playerPos, g.mapPos), cellSize) // position index
+
+	fi := subtract(pi, vector{float64(int(pi.x)), float64(int(pi.y))}) // fraction index
+
+	/*
+		PLAN:
+		length from pp to y edge
+		length from pp to x edge
+		choose which is shorter
+		make pythagor to find length
+		repeat
+
+		but it's not working normally ;(
+	*/
+
+	var rayLen float64 //length of the ray
+
+	// Start iteration
+	A := fi.x * cellSize
+	B := fi.y * cellSize
+
+	fx := A * k
+	fy := B / k
+
+	lx := math.Sqrt((A * A) + (fx * fx))
+	ly := math.Sqrt((B * B) + (fy * fy))
+
+	if lx < ly {
+		v = add(v, vector{lx, lx})
+		rayLen += lx
+		ly -= lx
+		lx = math.Sqrt(1 + k*k) //calculating new lx
+		pi.x += 1 * signX
+	} else {
+		v = add(v, vector{ly, ly})
+		rayLen += ly
+		lx -= ly
+		ly = math.Sqrt(1 + 1/(k*k)) //calculating new ly
+		pi.y += 1 * signY
+	}
+
+	wall := g.gameMap[int(pi.y)][int(pi.x)]
+
+	for wall == 0 {
+		// Following iterations
+		if lx < ly { //for X edge
+			v = multiply(add(v, vector{lx, lx}), signX) //adding length to vector
+			rayLen += lx                                //increasing our length
+			ly -= lx                                    //substracting our ly to match current position
+			lx = math.Sqrt(1 + k*k)                     //calculating new lx
+			pi.x += 1 * signX
+		} else { // for Y edge
+			v = multiply(add(v, vector{ly, ly}), signY)
+			rayLen += ly                //increasing our length
+			lx -= ly                    //substracting lx to match current position
+			ly = math.Sqrt(1 + 1/(k*k)) //calculating new ly
+			pi.y += 1 * signY
+		}
+		wall = g.gameMap[int(pi.y)][int(pi.x)]
+	}
+
+	return multiply(initV, rayLen) //make final vector
+}
+
+//normalize - converts vector to unit vector
+func norm(v vector) (res vector) {
+	mod := mod(v)
+	res.x = v.x / mod
+	res.y = v.y / mod
+	return res
+}
+
+//returns module (length) of the vector
+func mod(v vector) float64 {
+	return math.Sqrt((v.x * v.x) + (v.y * v.y))
+}
 
 func rotate(p vector, angle float64) (res vector) {
 
@@ -142,10 +252,6 @@ func rotate(p vector, angle float64) (res vector) {
 	res.y = p.x*math.Sin(angle) + p.y*math.Cos(angle)
 
 	return res
-}
-
-func len(v vector) float64 {
-	return math.Sqrt((v.x * v.x) + (v.y * v.y))
 }
 
 func subtract(a, b vector) (res vector) {
@@ -161,8 +267,8 @@ func add(a, b vector) (res vector) {
 }
 
 func multiply(a vector, v float64) (res vector) { //v - value
-	res.x = a.x / v
-	res.y = a.y / v
+	res.x = a.x * v
+	res.y = a.y * v
 	return res
 }
 
@@ -234,7 +340,7 @@ func main() {
 func NewGame(width, height int) *Game {
 
 	mapPos := vector{(sW / 2) - (mW / 2), (sH / 2) - (mH / 2)} // map position
-	playerStartPos := vector{sW / 2, sH / 2}                   //player initial position
+	playerStartPos := vector{(sW / 2) - 10, (sH / 2) - 10}     //player initial position
 	playerDir := vector{0, -viewLen}                           //player view direction
 
 	return &Game{width: width, height: height, gameMap: initGameMap(), mapPos: mapPos, playerPos: playerStartPos, viewDir: playerDir /*camPlane: camPlane*/}
