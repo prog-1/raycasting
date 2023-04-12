@@ -1,13 +1,16 @@
 package main
 
 import (
+	"fmt"
 	"image/color"
+	_ "image/png"
 	"log"
 	"math"
 	"math/rand"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
@@ -16,6 +19,8 @@ const (
 	screenHeight = 720
 	cellSize     = 8
 	rayNum       = 100
+	texWidth     = 64
+	texHeight    = 64
 )
 
 var (
@@ -55,16 +60,29 @@ type Point struct {
 type Game struct {
 	width, height   int
 	pos, dir, plane *Point
+	textures        [5]*ebiten.Image
 }
 
 func NewGame(width, height int) *Game {
 	return &Game{
-		width:  width,
-		height: height,
-		pos:    &Point{13, 13},
-		dir:    &Point{-1, 0},
-		plane:  &Point{0.3, 0.3},
+		width:    width,
+		height:   height,
+		pos:      &Point{13 * cellSize, 13 * cellSize},
+		dir:      &Point{-1, 0},
+		plane:    &Point{0, 0.5},
+		textures: loadTextures(),
 	}
+}
+
+func loadTextures() (textures [5]*ebiten.Image) {
+	for i := 1; i <= len(textures); i++ {
+		img, _, err := ebitenutil.NewImageFromFile(fmt.Sprintf("texture%d.png", i))
+		if err != nil {
+			panic(err)
+		}
+		textures[i-1] = img
+	}
+	return
 }
 
 func (g *Game) Layout(outWidth, outHeight int) (w, h int) {
@@ -79,57 +97,57 @@ func rotate(p *Point, angle float64) *Point {
 }
 
 func (g *Game) Update() error {
-	if ebiten.IsKeyPressed(ebiten.KeyW) && worldMap[int(g.pos.y+g.dir.y/10)][int(g.pos.x+g.dir.x/10)] == 0 {
-		g.pos.x += g.dir.x / 10
-		g.pos.y += g.dir.y / 10
+	if ebiten.IsKeyPressed(ebiten.KeyW) && worldMap[int(g.pos.y/cellSize+g.dir.y/2)][int(g.pos.x/cellSize+g.dir.x/2)] == 0 {
+		g.pos.x += g.dir.x / 2
+		g.pos.y += g.dir.y / 2
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyS) && worldMap[int(g.pos.y-g.dir.y/10)][int(g.pos.x-g.dir.x/10)] == 0 {
-		g.pos.x -= g.dir.x / 10
-		g.pos.y -= g.dir.y / 10
+	if ebiten.IsKeyPressed(ebiten.KeyS) && worldMap[int(g.pos.y/cellSize-g.dir.y/2)][int(g.pos.x/cellSize-g.dir.x/2)] == 0 {
+		g.pos.x -= g.dir.x / 2
+		g.pos.y -= g.dir.y / 2
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyA) && worldMap[int(g.pos.y-g.dir.x/10)][int(g.pos.x+g.dir.y/10)] == 0 {
-		g.pos.x += g.dir.y / 10
-		g.pos.y -= g.dir.x / 10
+	if ebiten.IsKeyPressed(ebiten.KeyA) && worldMap[int(g.pos.y/cellSize-g.dir.x/2)][int(g.pos.x/cellSize+g.dir.y/2)] == 0 {
+		g.pos.x += g.dir.y / 2
+		g.pos.y -= g.dir.x / 2
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyD) && worldMap[int(g.pos.y+g.dir.x/10)][int(g.pos.x-g.dir.y/10)] == 0 {
-		g.pos.x -= g.dir.y / 10
-		g.pos.y += g.dir.x / 10
+	if ebiten.IsKeyPressed(ebiten.KeyD) && worldMap[int(g.pos.y/cellSize+g.dir.x/2)][int(g.pos.x/cellSize-g.dir.y/2)] == 0 {
+		g.pos.x -= g.dir.y / 2
+		g.pos.y += g.dir.x / 2
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) {
-		g.dir = rotate(g.dir, -math.Pi/180)
-		g.plane = rotate(g.plane, -math.Pi/180)
+		g.dir = rotate(g.dir, -math.Pi/90)
+		g.plane = rotate(g.plane, -math.Pi/90)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyArrowRight) {
-		g.dir = rotate(g.dir, math.Pi/180)
-		g.plane = rotate(g.plane, math.Pi/180)
+		g.dir = rotate(g.dir, math.Pi/90)
+		g.plane = rotate(g.plane, math.Pi/90)
 	}
 	return nil
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
-	for i := 0; i < g.width; i++ {
-		cameraX := 2*float64(i)/float64(g.width) - 1
+	for x := 0; x < g.width; x++ {
+		cameraX := 2*float64(x)/float64(g.width) - 1
 		rayDir := Point{g.dir.x + g.plane.x*cameraX, g.dir.y + g.plane.y*cameraX}
 		p := Point{g.pos.x, g.pos.y}
-		deltaDist := Point{math.Abs(1 / rayDir.x), math.Abs(1 / rayDir.y)}
+		deltaDist := Point{math.Abs(1/rayDir.x) / cellSize, math.Abs(1/rayDir.y) / cellSize}
 		var sideDist, step Point
 		var perpWallDist float64
 		var side int
 		if rayDir.x < 0 {
 			step.x = -1
-			sideDist.x = (g.pos.x - p.x) * deltaDist.x
+			sideDist.x = (g.pos.x - p.x) / cellSize * deltaDist.x
 		} else {
 			step.x = 1
-			sideDist.x = (p.x + 1.0 - g.pos.x) * deltaDist.x
+			sideDist.x = (p.x + 1.0 - g.pos.x) / cellSize * deltaDist.x
 		}
 		if rayDir.y < 0 {
 			step.y = -1
-			sideDist.y = (g.pos.y - p.y) * deltaDist.y
+			sideDist.y = (g.pos.y - p.y) / cellSize * deltaDist.y
 		} else {
 			step.y = 1
-			sideDist.y = (p.y + 1.0 - g.pos.y) * deltaDist.y
+			sideDist.y = (p.y + 1.0 - g.pos.y) / cellSize * deltaDist.y
 		}
-		for worldMap[int(p.y)][int(p.x)] == 0 {
+		for worldMap[int(p.y)/cellSize][int(p.x)/cellSize] == 0 {
 			if sideDist.x < sideDist.y {
 				sideDist.x += deltaDist.x
 				p.x += step.x
@@ -154,12 +172,30 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		if drawEnd >= g.height {
 			drawEnd = g.height - 1
 		}
-		c := clr[worldMap[int(p.y)][int(p.x)]-1]
-		if side == 1 {
-			r, g, b, a := c.RGBA()
-			c = color.RGBA{uint8(float64(r>>8) * 0.3), uint8(float64(g>>8) * 0.3), uint8(float64(b>>8) * 0.3), uint8(float64(a >> 8))}
+		texNum := worldMap[int(p.y)/cellSize][int(p.x)/cellSize] - 1
+		var wallX float64
+		if side == 0 {
+			wallX = g.pos.y/cellSize + perpWallDist*rayDir.y
+		} else {
+			wallX = g.pos.x/cellSize + perpWallDist*rayDir.x
 		}
-		vector.StrokeLine(screen, float32(g.width-i), float32(drawStart), float32(g.width-i), float32(drawEnd), 3, c, false)
+		wallX -= math.Floor(wallX)
+		texX := int(wallX * float64(texWidth))
+		if (side == 0 && rayDir.x > 0) || (side == 1 && rayDir.y < 0) {
+			texX = texWidth - texX - 1
+		}
+		texStep := float64(1.0 * texHeight / lineHeight)
+		texPos := float64(drawStart-g.height/2+lineHeight/2) * texStep
+		for y := drawStart; y < drawEnd; y++ {
+			texY := int(texPos) & (texHeight - 1)
+			texPos += texStep
+			c := g.textures[texNum].At(texX, texY)
+			if side == 1 {
+				r, g, b, a := c.RGBA()
+				c = color.RGBA{uint8(float64(r>>8) * 0.5), uint8(float64(g>>8) * 0.5), uint8(float64(b>>8) * 0.5), uint8(float64(a >> 8))}
+			}
+			screen.Set(g.width-x, y, c)
+		}
 	}
 	for i := range worldMap {
 		for j := range worldMap[i] {
@@ -168,26 +204,26 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			}
 		}
 	}
-	vector.DrawFilledCircle(screen, float32(g.pos.x*cellSize), float32(g.pos.y*cellSize), 3, color.RGBA{255, 255, 0, 150}, false)
+	vector.DrawFilledCircle(screen, float32(g.pos.x), float32(g.pos.y), 3, color.RGBA{255, 255, 0, 150}, false)
 	for i := 0.0; i < rayNum; i++ {
 		cameraX := 2*i/float64(rayNum) - 1
 		rayDir := Point{g.dir.x + g.plane.x*cameraX, g.dir.y + g.plane.y*cameraX}
-		p := Point{g.pos.x * cellSize, g.pos.y * cellSize}
+		p := Point{g.pos.x, g.pos.y}
 		deltaDist := Point{math.Abs(1 / rayDir.x), math.Abs(1 / rayDir.y)}
 		var sideDist, step Point
 		if rayDir.x < 0 {
 			step.x = -1
-			sideDist.x = (g.pos.x*cellSize - p.x) * deltaDist.x
+			sideDist.x = (g.pos.x - p.x) * deltaDist.x
 		} else {
 			step.x = 1
-			sideDist.x = (p.x + 1.0 - g.pos.x*cellSize) * deltaDist.x
+			sideDist.x = (p.x + 1.0 - g.pos.x) * deltaDist.x
 		}
 		if rayDir.y < 0 {
 			step.y = -1
-			sideDist.y = (g.pos.y*cellSize - p.y) * deltaDist.y
+			sideDist.y = (g.pos.y - p.y) * deltaDist.y
 		} else {
 			step.y = 1
-			sideDist.y = (p.y + 1.0 - g.pos.y*cellSize) * deltaDist.y
+			sideDist.y = (p.y + 1.0 - g.pos.y) * deltaDist.y
 		}
 		for worldMap[int(p.y)/cellSize][int(p.x)/cellSize] == 0 {
 			if sideDist.x < sideDist.y {
@@ -198,7 +234,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 				p.y += step.y
 			}
 		}
-		vector.StrokeLine(screen, float32(g.pos.x*cellSize), float32(g.pos.y*cellSize), float32(p.x), float32(p.y), 3, color.RGBA{255, 255, 0, 50}, false)
+		vector.StrokeLine(screen, float32(g.pos.x), float32(g.pos.y), float32(p.x), float32(p.y), 3, color.RGBA{255, 255, 0, 50}, false)
 	}
 }
 
