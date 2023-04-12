@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	sw, sh = 720, 480
+	sw, sh = 1920, 1080
 	mw, mh = 4, 4                               // map width/height
 	cw, ch = float64(sw) / mw, float64(sh) / mh // cell width/height
 )
@@ -72,7 +72,7 @@ func NewGame() *game {
 		{1, 1, 1, 1},
 		{1, 0, 0, 1},
 		{1, 0, 0, 1},
-		{1, 1, 1, 1},
+		{2, 1, 1, 1},
 	}
 	return &game{
 		ebiten.NewImage(sw, sh),
@@ -96,7 +96,7 @@ func InitPlayer(maze [mh][mw]int) Player {
 		}
 	}
 
-	return Player{v.Vec{float64(x)*cw + cw/2, float64(y)*ch + ch/2, 0}, v.Vec{1, 0, 0}, 0.2, 0.01, 500, 250}
+	return Player{v.Vec{float64(x)*cw + cw/2, float64(y)*ch + ch/2, 0}, v.Vec{1, 0, 0}, 0.2, 0.0025, 500, 250}
 }
 
 func (g *game) Layout(outWidth, outHeight int) (w, h int) { return sw, sh }
@@ -128,52 +128,54 @@ func (g *game) Update() error {
 		upp(v.Mul(g.p.Dir, -g.p.ms*dt))
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		upp(v.Mul(*v.RotateZ(&g.p.Dir, -math.Pi/2), g.p.ms*dt))
+		upp(v.Mul(*v.RotateZ(&g.p.Dir, math.Pi/2), g.p.ms*dt))
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		upp(v.Mul(*v.RotateZ(&g.p.Dir, math.Pi/2), g.p.ms*dt))
+		upp(v.Mul(*v.RotateZ(&g.p.Dir, -math.Pi/2), g.p.ms*dt))
 	}
 
 	// Rotation
 	if ebiten.IsKeyPressed(ebiten.KeyQ) {
-		g.p.Dir = *v.RotateZ(&g.p.Dir, -g.p.rs*dt)
+		g.p.Dir = *v.RotateZ(&g.p.Dir, g.p.rs*dt)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyE) {
-		g.p.Dir = *v.RotateZ(&g.p.Dir, g.p.rs*dt)
+		g.p.Dir = *v.RotateZ(&g.p.Dir, -g.p.rs*dt)
 	}
 	return nil
 }
 func (g *game) Draw(screen *ebiten.Image) {
 	drawLine := func(a, b v.Vec, clr color.Color) {
-		ebitenutil.DrawLine(screen, a.X, a.Y, b.X, b.Y, clr)
+		ebitenutil.DrawLine(screen, a.X, sh-a.Y, b.X, sh-b.Y, clr)
 	}
 
 	// Maze
 	for y := range g.maze {
 		for x := range g.maze[y] {
 			if g.maze[y][x] == 1 {
-				ebitenutil.DrawRect(screen, cw*float64(x), float64(y)*ch, cw, ch, color.RGBA{255, 192, 203, 255})
-			} else if g.maze[y][x] == 2 {
-				ebitenutil.DrawRect(screen, cw*float64(x), float64(y)*ch, cw, ch, color.RGBA{255, 255, 255, 255})
+				ebitenutil.DrawRect(screen, cw*float64(x), sh-float64(mh-y-1)*ch, cw, -ch, color.RGBA{255, 192, 203, 255})
+			}
+			if g.maze[y][x] == 2 {
+				ebitenutil.DrawRect(screen, cw*float64(x), sh-float64(mh-y-1)*ch, cw, -ch, color.RGBA{255, 255, 203, 255})
 			}
 		}
 	}
 
 	// Player
-	ebitenutil.DrawCircle(screen, g.p.Pos.X, g.p.Pos.Y, 1, color.White)
+	ebitenutil.DrawCircle(screen, g.p.Pos.X, sh-g.p.Pos.Y, 1, color.White)
 	drawLine(g.p.Pos, v.Add(g.p.Pos, v.Mul(g.p.Dir, 10)), color.White)
 
 	// Rays
-	h := v.Mul(g.p.Dir, float64(g.p.h))
-	r := v.Mul(*v.RotateZ(&g.p.Dir, math.Pi/2), float64(g.p.a)/2)
-	pa, pb := v.Sub(h, r), v.Add(h, r)
-	ab := v.Sub(pb, pa)
-	for i := 0; i < g.rc; i++ {
-		ak := v.Mul(v.Div(ab, float64(g.rc)), float64(i))
-		pk := v.Add(pa, ak)
-		n := v.Normalize(pk)
-		drawLine(g.p.Pos, v.Add(g.p.Pos, v.Mul(n, GetLengthToIntersection(g, n))), color.RGBA{255, 255, 0, 255})
-	}
+	// h := v.Mul(g.p.Dir, float64(g.p.h))
+	// r := v.Mul(*v.RotateZ(&g.p.Dir, math.Pi/2), float64(g.p.a)/2)
+	// pa, pb := v.Sub(h, r), v.Add(h, r)
+	// ab := v.Sub(pb, pa)
+	// for i := 0; i < g.rc; i++ {
+	// 	ak := v.Mul(v.Div(ab, float64(g.rc)), float64(i))
+	// 	pk := v.Add(pa, ak)
+	// 	n := v.Normalize(pk)
+	// 	drawLine(g.p.Pos, v.Add(g.p.Pos, v.Mul(n, GetLengthToIntersection(g, n))), color.RGBA{255, 255, 0, 255})
+	// }
+	drawLine(g.p.Pos, v.Add(g.p.Pos, v.Mul(g.p.Dir, GetLengthToIntersection(g, g.p.Dir))), color.RGBA{255, 255, 0, 255})
 
 	screen.DrawImage(g.sb, &ebiten.DrawImageOptions{})
 }
@@ -183,8 +185,8 @@ func GetLengthToIntersection(g *game, d v.Vec) float64 {
 	k := d.Y / d.X
 	// Calculating starting distance to horizontal(lx) and vertical neighbors(ly)
 	p := v.Vec{g.p.Pos.X / cw, g.p.Pos.Y / ch, 0} // player position in cells
-	frac := func(a float64) float64 { return float64(int(a)) }
-	fp := v.Vec{p.X - frac(p.X), p.Y - frac(p.Y), 0} // fractional parts
+	frac := func(a float64) float64 { return a - float64(int(a)) }
+	fp := v.Vec{frac(p.X), frac(p.Y), 0} // fractional parts
 	lp := v.Vec{1 - fp.X, 1 - fp.Y, 0}
 	// X:
 	fx := k * lp.X
@@ -194,10 +196,13 @@ func GetLengthToIntersection(g *game, d v.Vec) float64 {
 	ly := math.Sqrt(lp.Y*lp.Y + fy*fy)
 
 	c := Pair[int, int]{int(p.X), int(p.Y)} // Player's cell
-	var l float64                           // Ray's line segment's length
-	if lx < ly {
-		l = lx * cw
-		if lp.X > 0 { // Function grows along +X
+	l := float64(0)                         // Ray's line segment's length
+	if d.X == 0 && d.Y == 0 {
+		return 0
+	}
+	if d.X != 0 && (ly == 0 || lx < ly) {
+		l += v.Mod(v.Vec{lp.X * cw, fx * ch, 0})
+		if d.X > 0 { // Function grows along +X
 			// Checkinig right neighbor
 			if g.maze[c.X+1][c.Y] != 0 {
 				return l
@@ -209,15 +214,15 @@ func GetLengthToIntersection(g *game, d v.Vec) float64 {
 			}
 		}
 	} else {
-		l = ly * ch
-		if lp.Y > 0 {
+		l += v.Mod(v.Vec{fy * cw, lp.Y * ch, 0})
+		if d.Y > 0 {
 			// Checking upper neighbor
-			if g.maze[c.X][c.Y-1] != 0 {
+			if g.maze[c.X][c.Y+1] != 0 {
 				return l
 			}
 		} else {
 			// Checking lower neighbor
-			if g.maze[c.X][c.Y+1] != 0 {
+			if g.maze[c.X][c.Y-1] != 0 {
 				return l
 			}
 		}
