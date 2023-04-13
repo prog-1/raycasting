@@ -114,6 +114,13 @@ func (g *Game) Update() error {
 	return nil
 }
 
+func GetTheSign(v float64) float64 { // returns -1 or 1
+	if math.Ceil(v) == 0 {
+		return math.Floor(v)
+	}
+	return math.Ceil(v)
+}
+
 func DrawMap(img *ebiten.Image, pos, dir Point) {
 	for i := range Map {
 		for j := range Map[i] {
@@ -137,10 +144,33 @@ func DrawMap(img *ebiten.Image, pos, dir Point) {
 	startdir := Point{dir.x*math.Cos(-math.Pi/6) - dir.y*math.Sin(-math.Pi/6), dir.x*math.Sin(-math.Pi/6) + dir.y*math.Cos(-math.Pi/6)}
 	for i := 0; i <= 319; i++ {
 		ray := Point{startdir.x*math.Cos(float64(i)*60/320*math.Pi/180) - startdir.y*math.Sin(float64(i)*60/320*math.Pi/180), startdir.x*math.Sin(float64(i)*60/320*math.Pi/180) + startdir.y*math.Cos(float64(i)*60/320*math.Pi/180)}
-		d := Point{pos.x + ray.x, pos.y + ray.y}
-		for ; Map[int(d.y/15)][int(d.x/15)] == 0; d.x, d.y = d.x+ray.x, d.y+ray.y {
+		kx, ky := ray.y/ray.x, ray.x/ray.y
+		prevx, prevy := int(pos.x)-int(pos.x)%15, int(pos.y)-int(pos.y)%15
+		A, B := pos.x-float64(prevx), pos.y-float64(prevy)
+		if ray.x > 0 {
+			A = float64(prevx) + 15 - pos.x
 		}
-		ebitenutil.DrawLine(img, pos.x, pos.y, d.x, d.y, color.RGBA{0xf8, 0xf0, 0x00, 0xff})
+		if ray.y > 0 {
+			B = float64(prevy) + 15 - pos.y
+		}
+		lx, ly := math.Sqrt(math.Pow(A*kx, 2)+math.Pow(A, 2)), math.Sqrt(math.Pow(B*ky, 2)+math.Pow(B, 2))
+		startx, starty := Point{pos.x + A*GetTheSign(ray.x), pos.y + A*math.Abs(kx)*GetTheSign(ray.y)}, Point{pos.x + B*math.Abs(ky)*GetTheSign(ray.x), pos.y + B*GetTheSign(ray.y)}
+		for startx.x >= 0 && startx.y >= 0 && starty.x >= 0 && starty.y >= 0 && Map[int(startx.y/15)][int(startx.x/15)] == 0 && Map[int(starty.y/15)][int(starty.x/15)] == 0 {
+			if lx > ly {
+				startx.x, startx.y = startx.x+15*GetTheSign(ray.x), startx.y+15*math.Abs(kx)*GetTheSign(ray.y)
+				lx += math.Sqrt(math.Pow(15, 2) + math.Pow(15*kx, 2))
+			} else {
+				starty.x, starty.y = starty.x+15*math.Abs(ky)*GetTheSign(ray.x), starty.y+15*GetTheSign(ray.y)
+				ly += math.Sqrt(math.Pow(15, 2) + math.Pow(15*ky, 2))
+			}
+			// fmt.Println("startx:", i, startx.x, startx.y)
+			// fmt.Println("starty:", i, starty.x, starty.y)
+		}
+		if lx > ly {
+			ebitenutil.DrawLine(img, pos.x, pos.y, startx.x, startx.y, color.RGBA{0xf8, 0xf0, 0x00, 0xff})
+		} else {
+			ebitenutil.DrawLine(img, pos.x, pos.y, starty.x, starty.y, color.RGBA{0xf8, 0xf0, 0x00, 0xff})
+		}
 	}
 }
 
