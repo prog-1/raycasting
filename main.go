@@ -183,8 +183,16 @@ func (g *game) Draw(screen *ebiten.Image) {
 
 	// Screen manipulations:
 	opts := ebiten.DrawImageOptions{}
-	opts.GeoM.Translate(-g.P.Pos.X*cs, -g.P.Pos.Y*cs)
-	opts.GeoM.Scale(1, -1)                                                                  // Flipping along OX
+	p := ebiten.GeoM{}
+	opts.GeoM.Translate(-g.P.Pos.X*cs, -g.P.Pos.Y*cs) // Translation: World -> Player local
+	// x, y rotated by 90 deg. = -y,x
+	p.SetElement(0, 0, -g.P.Dir.Y) // p1.X
+	p.SetElement(0, 1, g.P.Dir.X)  // p1.Y
+	p.SetElement(1, 0, g.P.Dir.X)  // p2.X
+	p.SetElement(1, 1, g.P.Dir.Y)  // p2.Y
+	p.Invert()
+	opts.GeoM.Concat(p)                                                                     // Multiplication
+	opts.GeoM.Scale(-1, -1)                                                                 // Flipping along OX
 	opts.GeoM.Translate(float64(screen.Bounds().Max.X/2), float64(screen.Bounds().Max.Y/2)) // Moving coord. center to screen center
 	screen.DrawImage(g.sb, &opts)
 	g.sb.Clear()
