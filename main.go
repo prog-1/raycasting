@@ -1,9 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"image/color"
 	"log"
+	"math"
+	"time"
 
 	"github.com/deeean/go-vector/vector2"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -11,7 +12,7 @@ import (
 )
 
 const (
-	sw, sh = 1920, 1080 //(in pixels)
+	sw, sh = 1920, 1080 // screen width/height(in pixels)
 	mw, mh = 4, 4       // map width/height(in cells)
 )
 
@@ -20,9 +21,15 @@ type Pair[T, U any] struct {
 	Y U
 }
 
+func RotateZ(v *vector2.Vector2, rad float64) *vector2.Vector2 {
+	x := v.X*math.Cos(rad) - v.Y*math.Sin(rad)
+	y := v.X*math.Sin(rad) + v.Y*math.Cos(rad)
+	return &vector2.Vector2{X: x, Y: y}
+}
+
 type Player struct {
-	Pos    vector2.Vector2
-	Dir    vector2.Vector2
+	Pos    *vector2.Vector2
+	Dir    *vector2.Vector2
 	ms, rs float64 // Movement and Rotation speed
 	l, h   int     // base length and height of player's FOV sector
 }
@@ -61,7 +68,6 @@ func NewGame() *game {
 			}
 		}
 	}
-	fmt.Println(maze)
 	FlipMazeVertically(&maze)
 
 	NewPlayer := func() Player {
@@ -72,13 +78,16 @@ func NewGame() *game {
 					break
 				}
 			}
+			if maze[y][x] == 9 {
+				break
+			}
 		}
 		if x == mw && y == mh { // Maze's bottom right cell(which has to be a wall) -> No 9 in maze
 			panic("Maze must have player spawn(9)")
 		}
 		return Player{
-			Pos: vector2.Vector2{float64(x), float64(y)},
-			Dir: vector2.Vector2{1, 0},
+			Pos: &vector2.Vector2{X: float64(x) + 0.5, Y: float64(y) + 0.5},
+			Dir: &vector2.Vector2{X: 1, Y: 0},
 			ms:  0.2, rs: 0.0025,
 			l: 1, h: 1}
 	}
@@ -93,149 +102,78 @@ func NewGame() *game {
 
 func (g *game) Layout(outWidth, outHeight int) (w, h int) { return sw, sh }
 func (g *game) Update() error {
-	// dt := float64(time.Now().UnixMilli() - g.pft)
-	// g.pft = time.Now().UnixMilli()
+	dt := float64(time.Now().UnixMilli() - g.pft)
+	sp := dt / 100 // speed factor
+	g.pft = time.Now().UnixMilli()
 
-	// // dp - delta position(new pos - cur pos)
-	// upp := func(dp vector2.Vector2) { // Update player's position
-	// 	np := vector2.Vector2{g.P.Pos.X + dp.X, g.P.Pos.Y + dp.Y} // New position
-	// 	ci := Pair[int, int]{int(g.P.Pos.X), int(g.P.Pos.Y)}      // Index of the cell containing current position
-	// 	ni := Pair[int, int]{int(np.X), int(np.Y)}                // Index of the cell containing new position
-	// 	// Checking whether we're not moving into a wall:
-	// 	if ni.X != ci.X || ni.Y != ci.Y { // We're not in the previous cell
-	// 		if g.Maze[ni.Y][ni.X] == 0 {
-	// 			if g.Maze[ci.Y][ci.X+(ni.X-ci.X)] == 0 || g.Maze[ci.Y+(ci.Y-ni.Y)][ci.X] == 0 {
+	// dp - delta position(new pos - cur pos)
+	upp := func(dp vector2.Vector2) { // Update player's position
+		np := vector2.Vector2{X: g.P.Pos.X + dp.X, Y: g.P.Pos.Y + dp.Y} // New position
+		ci := Pair[int, int]{int(g.P.Pos.X), int(g.P.Pos.Y)}            // Index of the cell containing current position
+		ni := Pair[int, int]{int(np.X), int(np.Y)}                      // Index of the cell containing new position
+		// Checking whether we're not moving into a wall:
+		if ni.X != ci.X || ni.Y != ci.Y { // We're not in the previous cell
+			if g.Maze[ni.Y][ni.X] == 0 {
+				if g.Maze[ci.Y][ci.X+(ni.X-ci.X)] == 0 || g.Maze[ci.Y+(ni.Y-ci.Y)][ci.X] == 0 {
+					g.P.Pos = &np
+				}
+			}
+		} else {
+			g.P.Pos = &np
+		}
+	}
 
-	// 			}
-	// 		}
-	// 	} else {
-	// 		g.P.Pos = np
-	// 	}
-	// }
+	// Movement:
+	if ebiten.IsKeyPressed(ebiten.KeyW) {
+		upp(*g.P.Dir.MulScalar(g.P.ms * sp))
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyS) {
+		upp(*g.P.Dir.MulScalar(-g.P.ms * sp))
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyA) {
+		upp(*RotateZ(g.P.Dir, math.Pi/2).MulScalar(g.P.ms * sp))
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyD) {
+		upp(*RotateZ(g.P.Dir, -math.Pi/2).MulScalar(g.P.ms * sp))
+	}
 
-	// // Movement:
-	// if ebiten.IsKeyPressed(ebiten.KeyW) {
-	// 	upp(v.Mul(g.P.Dir, g.P.ms*dt))
-	// }
-	// if ebiten.IsKeyPressed(ebiten.KeyS) {
-	// 	upp(v.Mul(g.P.Dir, -g.P.ms*dt))
-	// }
-	// if ebiten.IsKeyPressed(ebiten.KeyA) {
-	// 	upp(v.Mul(*v.RotateZ(&g.P.Dir, math.Pi/2), g.P.ms*dt))
-	// }
-	// if ebiten.IsKeyPressed(ebiten.KeyD) {
-	// 	upp(v.Mul(*v.RotateZ(&g.P.Dir, -math.Pi/2), g.P.ms*dt))
-	// }
-
-	// // Rotation
-	// if ebiten.IsKeyPressed(ebiten.KeyQ) {
-	// 	g.P.Dir = *v.RotateZ(&g.P.Dir, g.P.rs*dt)
-	// }
-	// if ebiten.IsKeyPressed(ebiten.KeyE) {
-	// 	g.P.Dir = *v.RotateZ(&g.P.Dir, -g.P.rs*dt)
-	// }
+	// Rotation
+	if ebiten.IsKeyPressed(ebiten.KeyQ) {
+		g.P.Dir = RotateZ(g.P.Dir, g.P.rs*dt)
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyE) {
+		g.P.Dir = RotateZ(g.P.Dir, -g.P.rs*dt)
+	}
 	return nil
 }
 func (g *game) Draw(screen *ebiten.Image) {
 	const cw, ch = float64(sw) / mw, float64(sh) / mh // cell width/height(in pixels)
 
-	// drawLine := func(a, b v.Vec, clr color.Color) {
-	// 	ebitenutil.DrawLine(screen, a.X, sh-a.Y, b.X, sh-b.Y, clr)
-	// }
+	drawLine := func(a, b *vector2.Vector2, clr color.Color) {
+		x, y := a.X*cw, (sh - a.Y*ch)
+		x2, y2 := b.X*cw, (sh - b.Y*ch)
+		ebitenutil.DrawLine(screen, x, y, x2, y2, clr)
+	}
 
 	// Maze
 	for y := range g.Maze {
 		for x := range g.Maze[y] {
 			if g.Maze[y][x] == 1 { // Pink
-				ebitenutil.DrawRect(screen, cw*float64(x), sh-float64(y)*ch, cw, -ch, color.RGBA{255, 192, 203, 255})
+				ebitenutil.DrawRect(screen, float64(x)*cw, sh-float64(y)*ch, cw, -ch, color.RGBA{255, 192, 203, 255})
 			}
 			if g.Maze[y][x] == 2 { // White
-				ebitenutil.DrawRect(screen, cw*float64(x), sh-float64(y)*ch, cw, -ch, color.RGBA{255, 255, 255, 255})
+				ebitenutil.DrawRect(screen, float64(x)*cw, sh-float64(y)*ch, cw, -ch, color.RGBA{255, 255, 255, 255})
 			}
 		}
 	}
 
 	// Player
-	ebitenutil.DrawCircle(screen, g.P.Pos.X, sh-g.P.Pos.Y, 1, color.White)
-	// drawLine(g.P.Pos, v.Add(g.P.Pos, v.Mul(g.P.Dir, 10)), color.White)
-
-	// // Rays
-	// // h := v.Mul(g.P.Dir, float64(g.P.h))
-	// // r := v.Mul(*v.RotateZ(&g.P.Dir, math.Pi/2), float64(g.P.a)/2)
-	// // pa, pb := v.Sub(h, r), v.Add(h, r)
-	// // ab := v.Sub(pb, pa)
-	// // for i := 0; i < g.rc; i++ {
-	// // 	ak := v.Mul(v.Div(ab, float64(g.rc)), float64(i))
-	// // 	pk := v.Add(pa, ak)
-	// // 	n := v.Normalize(pk)
-	// // 	drawLine(g.P.Pos, v.Add(g.P.Pos, v.Mul(n, GetLengthToIntersection(g, n))), color.RGBA{255, 255, 0, 255})
-	// // }
-	// drawLine(g.P.Pos, v.Add(g.P.Pos, v.Mul(g.P.Dir, GetLengthToIntersection(g, g.P.Dir))), color.RGBA{255, 255, 0, 255})
+	ebitenutil.DrawCircle(screen, g.P.Pos.X*cw, sh-g.P.Pos.Y*ch, 2, color.White)
+	tmp := g.P.Pos.Add(g.P.Dir)
+	drawLine(g.P.Pos, tmp, color.White)
 
 	screen.DrawImage(g.sb, &ebiten.DrawImageOptions{})
 }
-
-// Returns length of the ray casted from the player position along the directional normal vector(v) after hitting the wall
-// func GetLengthToIntersection(g *game, d v.Vec) float64 {
-// 	k := d.Y / d.X
-// 	// Calculating starting distance to horizontal(lx) and vertical neighbors(ly)
-// 	p := v.Vec{g.P.Pos.X / cw, g.P.Pos.Y / ch, 0} // player position in cells
-// 	// var x float64
-// 	// if d.X < 0 {
-// 	// 	x = p.X - math.Trunc(p.X)
-// 	// } else {
-// 	// 	x = math.Trunc(p.X+1) - p.X
-// 	// }
-// 	// var y float64
-// 	// if d.Y < 0 {
-// 	// 	y = p.Y - math.Trunc(p.Y)
-// 	// } else {
-// 	// 	y = math.Trunc(p.Y+1) - p.Y
-// 	// }
-// 	fp := v.Vec{p.X - math.Trunc(p.X), p.Y - math.Trunc(p.Y), 0} // fractional parts
-
-// 	lp := v.Vec{1 - fp.X, 1 - fp.Y, 0}
-// 	// X:
-// 	fx := k * lp.X
-// 	lx := math.Sqrt(lp.X*lp.X + fx*fx)
-// 	// Y:
-// 	fy := lp.Y / k
-// 	ly := math.Sqrt(lp.Y*lp.Y + fy*fy)
-
-// 	c := Pair[int, int]{int(p.X), int(p.Y)} // Player's cell
-// 	l := float64(0)                         // Ray's line segment's length
-// 	if d.X == 0 && d.Y == 0 {
-// 		return 0
-// 	}
-// 	if d.X != 0 && (ly == 0 || lx < ly) {
-// 		l += v.Mod(v.Vec{lp.X * cw, fx * ch, 0})
-// 		if d.X > 0 { // Function grows along +X
-// 			// Checkinig right neighbor
-// 			if g.Maze[c.X+1][c.Y] != 0 {
-// 				return l
-// 			}
-// 		} else {
-// 			// Checking left neighbor
-// 			if g.Maze[c.X-1][c.Y] != 0 {
-// 				return l
-// 			}
-// 		}
-// 	} else {
-// 		l += v.Mod(v.Vec{fy * cw, lp.Y * ch, 0})
-// 		if d.Y > 0 {
-// 			// Checking upper neighbor
-// 			if g.Maze[c.X][c.Y+1] != 0 {
-// 				return l
-// 			}
-// 		} else {
-// 			// Checking lower neighbor
-// 			if g.Maze[c.X][c.Y-1] != 0 {
-// 				return l
-// 			}
-// 		}
-// 	}
-// 	return 0
-// }
 
 func main() {
 	ebiten.SetWindowSize(sw, sh)
