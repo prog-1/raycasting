@@ -141,7 +141,7 @@ func (g *game) Update() error {
 		upp(*RotateZ(g.P.Dir, -math.Pi/2).MulScalar(g.P.ms * sp))
 	}
 
-	// Rotation
+	// Rotation:
 	if ebiten.IsKeyPressed(ebiten.KeyQ) {
 		g.P.Dir = RotateZ(g.P.Dir, g.P.rs*dt)
 	}
@@ -154,30 +154,31 @@ func (g *game) Draw(screen *ebiten.Image) {
 	const cs = float64(ms) / cc // cell size(width/height(in pixels))
 
 	drawLine := func(a, b *vector2.Vector2, clr color.Color) {
-		x, y := a.X*cs, (sh - a.Y*cs)
-		x2, y2 := b.X*cs, (sh - b.Y*cs)
-		ebitenutil.DrawLine(g.sb, x, y, x2, y2, clr)
+		u := a.MulScalar(cs)
+		v := b.MulScalar(cs)
+		ebitenutil.DrawLine(g.sb, u.X, u.Y, v.X, v.Y, clr)
 	}
 
-	// Maze
+	// Maze:
 	for y := range g.Maze {
 		for x := range g.Maze[y] {
 			if g.Maze[y][x] == 1 { // Pink
-				ebitenutil.DrawRect(g.sb, float64(x)*cs, sh-float64(y)*cs, cs, -cs, color.RGBA{255, 192, 203, 255})
+				ebitenutil.DrawRect(g.sb, float64(x)*cs, float64(y)*cs, cs, cs, color.RGBA{255, 192, 203, 255})
 			}
 			if g.Maze[y][x] == 2 { // White
-				ebitenutil.DrawRect(g.sb, float64(x)*cs, sh-float64(y)*cs, cs, -cs, color.RGBA{255, 255, 255, 255})
+				ebitenutil.DrawRect(g.sb, float64(x)*cs, float64(y)*cs, cs, cs, color.RGBA{255, 255, 255, 255})
 			}
 		}
 	}
 
-	// Player
-	ebitenutil.DrawCircle(g.sb, g.P.Pos.X*cs, sh-g.P.Pos.Y*cs, 2, color.White)
+	// Player:
+	ebitenutil.DrawCircle(g.sb, g.P.Pos.X*cs, g.P.Pos.Y*cs, 2, color.White)
 	drawLine(g.P.Pos, g.P.Pos.Add(g.P.Dir), color.White)
 
-	// Screen manipulations
+	// Screen manipulations:
 	opts := ebiten.DrawImageOptions{}
-	opts.GeoM.Translate(sw/2-cc/2*cs, -sh/2+cc/2*cs)
+	opts.GeoM.Scale(1, -1)                          // Flipping along OX
+	opts.GeoM.Translate(sw/2-cc/2*cs, sh/2+cc/2*cs) // Moving maze to the screen's center
 	screen.DrawImage(g.sb, &opts)
 	g.sb.Clear()
 }
