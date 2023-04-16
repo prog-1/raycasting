@@ -24,7 +24,7 @@ type (
 		m             *ebiten.Image
 		p, dir, plane point
 		pg            [][]int
-		// lp            point
+		rotation      float64
 	}
 )
 
@@ -36,43 +36,48 @@ func rotate(p *point, angle float64) {
 
 }
 
-// func rotate2(p *point, angle float64) {
-// 	x, y := p.x, p.y
-
-// 	p.x = (x*math.Cos(angle) - y*math.Sin(angle))
-// 	p.y = (x*math.Sin(angle) + y*math.Cos(angle))
-
-// }
-
 func (g *game) Layout(outWidth, outHeight int) (w, h int) { return screenWidth, screenHeight }
 
 func (g *game) Update() error {
 
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
 		rotate(&g.dir, math.Pi/100)
+		g.rotation += math.Pi / 100
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
 		rotate(&g.dir, -math.Pi/100)
-
+		g.rotation -= math.Pi / 100
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyArrowDown) {
 		if g.pg[((int(g.p.y)-38)/50)+1][int(g.p.x)/50] == 0 {
-			g.p.y += 5
+			tmp := &point{5, 0}
+			rotate(tmp, g.rotation)
+			g.p.y += tmp.y
+			g.p.x += tmp.x
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) {
 		if g.pg[(int(g.p.y))/50][int(g.p.x+38)/50-1] == 0 {
-			g.p.x -= 5
+			tmp := &point{0, -5}
+			rotate(tmp, g.rotation)
+			g.p.y += tmp.y
+			g.p.x += tmp.x
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyArrowRight) {
 		if g.pg[(int(g.p.y))/50][int(g.p.x-38)/50+1] == 0 {
-			g.p.x += 5
+			tmp := &point{0, 5}
+			rotate(tmp, g.rotation)
+			g.p.y += tmp.y
+			g.p.x += tmp.x
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyArrowUp) {
 		if g.pg[(int(g.p.y+38))/50-1][int(g.p.x)/50] == 0 {
-			g.p.y -= 5
+			tmp := &point{-5, 0}
+			rotate(tmp, g.rotation)
+			g.p.y += tmp.y
+			g.p.x += tmp.x
 		}
 	}
 
@@ -80,8 +85,13 @@ func (g *game) Update() error {
 }
 
 func (g *game) Draw(screen *ebiten.Image) {
-	screen.DrawImage(g.m, nil)
-	ebitenutil.DrawCircle(screen, g.p.x, g.p.y, 10, color.RGBA{0xff, 0xff, 0x00, 0xff})
+	var op ebiten.DrawImageOptions
+	// w, h := g.m.Size()
+	op.GeoM.Translate(-g.p.x, -g.p.y)
+	op.GeoM.Rotate(g.rotation)
+	op.GeoM.Translate(screenWidth/2, screenHeight/2)
+	screen.DrawImage(g.m, &op)
+	ebitenutil.DrawCircle(screen, screenWidth/2, screenHeight/2, 10, color.RGBA{0xff, 0xff, 0x00, 0xff})
 	for i := 0.0; i < 400; i++ {
 		var side, step point
 		cameraX := i/200.0 - 1
@@ -111,7 +121,10 @@ func (g *game) Draw(screen *ebiten.Image) {
 				p.y += step.y
 			}
 		}
-		ebitenutil.DrawLine(screen, g.p.x, g.p.y, p.x, p.y, color.RGBA{0xff, 0xff, 0x00, 0xff})
+		p1 := point{p.x - screenWidth, p.y - screenHeight}
+		rotate(&p1, -g.rotation)
+		p1 = point{p1.x + screenWidth, p1.y + screenHeight}
+		ebitenutil.DrawLine(screen, screenWidth/2, screenHeight/2, screenWidth/2+p1.x, screenHeight/2+p1.y, color.RGBA{0xff, 0xff, 0x00, 0xff})
 	}
 
 }
@@ -169,10 +182,9 @@ func NewGame() *game {
 	}
 
 	return &game{
-		m:  DrawBackground(ebiten.NewImage(screenWidth, screenHeight), pg),
-		p:  point{100, 100},
-		pg: pg,
-		// lp:    point{300, 500},
+		m:     DrawBackground(ebiten.NewImage(screenWidth, screenHeight), pg),
+		p:     point{100, 100},
+		pg:    pg,
 		dir:   point{1, 0},
 		plane: point{0.5, 0.5},
 	}
