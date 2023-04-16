@@ -162,23 +162,30 @@ func (g *game) Draw(screen *ebiten.Image) {
 	// Maze:
 	for y := range g.Maze {
 		for x := range g.Maze[y] {
-			if g.Maze[y][x] == 1 { // Pink
-				ebitenutil.DrawRect(g.sb, float64(x)*cs, float64(y)*cs, cs, cs, color.RGBA{255, 192, 203, 255})
-			}
-			if g.Maze[y][x] == 2 { // White
-				ebitenutil.DrawRect(g.sb, float64(x)*cs, float64(y)*cs, cs, cs, color.RGBA{255, 255, 255, 255})
+			if g.Maze[y][x] != 0 && g.Maze[y][x] != 9 {
+				cp := vector2.Vector2{X: float64(x) * cs, Y: float64(y) * cs} // cell pos(pixels)
+				var clr color.Color
+				switch g.Maze[y][x] {
+				case 1:
+					clr = color.RGBA{255, 192, 203, 255} // Pink
+				case 2:
+					clr = color.White
+				}
+
+				ebitenutil.DrawRect(g.sb, cp.X, cp.Y, cs, cs, clr)
 			}
 		}
 	}
 
 	// Player:
-	ebitenutil.DrawCircle(g.sb, g.P.Pos.X*cs, g.P.Pos.Y*cs, 2, color.White)
+	ebitenutil.DrawCircle(g.sb, g.P.Pos.X*cs, g.P.Pos.Y*cs, 10, color.White)
 	drawLine(g.P.Pos, g.P.Pos.Add(g.P.Dir), color.White)
 
 	// Screen manipulations:
 	opts := ebiten.DrawImageOptions{}
-	opts.GeoM.Scale(1, -1)                          // Flipping along OX
-	opts.GeoM.Translate(sw/2-cc/2*cs, sh/2+cc/2*cs) // Moving maze to the screen's center
+	opts.GeoM.Translate(-g.P.Pos.X*cs, -g.P.Pos.Y*cs)
+	opts.GeoM.Scale(1, -1)                                                                  // Flipping along OX
+	opts.GeoM.Translate(float64(screen.Bounds().Max.X/2), float64(screen.Bounds().Max.Y/2)) // Moving coord. center to screen center
 	screen.DrawImage(g.sb, &opts)
 	g.sb.Clear()
 }
