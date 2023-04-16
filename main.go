@@ -12,8 +12,9 @@ import (
 )
 
 const (
-	sw, sh = 1920, 1080 // screen width/height(in pixels)
-	mw, mh = 4, 4       // map width/height(in cells)
+	sw, sh = 1920, 1080 // screen width and height(in pixels)
+	ms     = 500        // map width/height(width=height)(in pixels)
+	cc     = 4          // cell count in row/column(row=column)
 )
 
 type Pair[T, U any] struct {
@@ -35,7 +36,7 @@ type Player struct {
 }
 
 type game struct {
-	Maze *[mh][mw]int
+	Maze *[cc][cc]int
 	P    Player
 	RC   int           //Ray Count
 	pft  int64         // Previous frame time
@@ -48,23 +49,23 @@ func NewGame() *game {
 	// 1 - pink wall
 	// 9 - player spawn
 	// NOTE: Maze must have player spawn walls along the perimeter
-	maze := [mh][mw]int{
+	maze := [cc][cc]int{
 		{1, 1, 1, 1},
 		{1, 0, 0, 1},
 		{1, 9, 0, 1},
 		{2, 1, 1, 1},
 	}
 
-	FlipMazeVertically := func(m *[mh][mw]int) {
+	FlipMazeVertically := func(m *[cc][cc]int) {
 		swap := func(a, b *int) {
 			tmp := *a
 			*a = *b
 			*b = tmp
 		}
 
-		for c := 0; c < mw/2; c++ {
-			for r := 0; r < mh/2; r++ {
-				swap(&m[r][c], &m[mh-r-1][c])
+		for c := 0; c < cc/2; c++ {
+			for r := 0; r < cc/2; r++ {
+				swap(&m[r][c], &m[cc-r-1][c])
 			}
 		}
 	}
@@ -82,7 +83,7 @@ func NewGame() *game {
 				break
 			}
 		}
-		if x == mw && y == mh { // Maze's bottom right cell(which has to be a wall) -> No 9 in maze
+		if x == cc && y == cc { // Maze's bottom right cell(which has to be a wall) -> No 9 in maze
 			panic("Maze must have player spawn(9)")
 		}
 		return Player{
@@ -113,9 +114,12 @@ func (g *game) Update() error {
 		ni := Pair[int, int]{int(np.X), int(np.Y)}                      // Index of the cell containing new position
 		// Checking whether we're not moving into a wall:
 		if ni.X != ci.X || ni.Y != ci.Y { // We're not in the previous cell
-			if g.Maze[ni.Y][ni.X] == 0 {
-				if g.Maze[ci.Y][ci.X+(ni.X-ci.X)] == 0 || g.Maze[ci.Y+(ni.Y-ci.Y)][ci.X] == 0 {
-					g.P.Pos = &np
+			if g.Maze[ni.Y][ni.X] == 0 || g.Maze[ni.Y][ni.X] == 9 { // We're moving into the empty cell
+				// Checking diagonal neighbors:
+				if g.Maze[ci.Y][ci.X+(ni.X-ci.X)] == 0 || g.Maze[ci.Y][ci.X+(ni.X-ci.X)] == 9 {
+					if g.Maze[ci.Y+(ni.Y-ci.Y)][ci.X] == 0 || g.Maze[ci.Y+(ni.Y-ci.Y)][ci.X] == 9 {
+						g.P.Pos = &np
+					}
 				}
 			}
 		} else {
@@ -147,32 +151,35 @@ func (g *game) Update() error {
 	return nil
 }
 func (g *game) Draw(screen *ebiten.Image) {
-	const cw, ch = float64(sw) / mw, float64(sh) / mh // cell width/height(in pixels)
+	const cs = float64(ms) / cc // cell size(width/height(in pixels))
 
 	drawLine := func(a, b *vector2.Vector2, clr color.Color) {
-		x, y := a.X*cw, (sh - a.Y*ch)
-		x2, y2 := b.X*cw, (sh - b.Y*ch)
-		ebitenutil.DrawLine(screen, x, y, x2, y2, clr)
+		x, y := a.X*cs, (sh - a.Y*cs)
+		x2, y2 := b.X*cs, (sh - b.Y*cs)
+		ebitenutil.DrawLine(g.sb, x, y, x2, y2, clr)
 	}
 
 	// Maze
 	for y := range g.Maze {
 		for x := range g.Maze[y] {
 			if g.Maze[y][x] == 1 { // Pink
-				ebitenutil.DrawRect(screen, float64(x)*cw, sh-float64(y)*ch, cw, -ch, color.RGBA{255, 192, 203, 255})
+				ebitenutil.DrawRect(g.sb, float64(x)*cs, sh-float64(y)*cs, cs, -cs, color.RGBA{255, 192, 203, 255})
 			}
 			if g.Maze[y][x] == 2 { // White
-				ebitenutil.DrawRect(screen, float64(x)*cw, sh-float64(y)*ch, cw, -ch, color.RGBA{255, 255, 255, 255})
+				ebitenutil.DrawRect(g.sb, float64(x)*cs, sh-float64(y)*cs, cs, -cs, color.RGBA{255, 255, 255, 255})
 			}
 		}
 	}
 
 	// Player
-	ebitenutil.DrawCircle(screen, g.P.Pos.X*cw, sh-g.P.Pos.Y*ch, 2, color.White)
-	tmp := g.P.Pos.Add(g.P.Dir)
-	drawLine(g.P.Pos, tmp, color.White)
+	ebitenutil.DrawCircle(g.sb, g.P.Pos.X*cs, sh-g.P.Pos.Y*cs, 2, color.White)
+	drawLine(g.P.Pos, g.P.Pos.Add(g.P.Dir), color.White)
 
-	screen.DrawImage(g.sb, &ebiten.DrawImageOptions{})
+	// Screen manipulations
+	opts := ebiten.DrawImageOptions{}
+	opts.GeoM.Translate(sw/2-cc/2*cs, -sh/2+cc/2*cs)
+	screen.DrawImage(g.sb, &opts)
+	g.sb.Clear()
 }
 
 func main() {
