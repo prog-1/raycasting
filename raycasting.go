@@ -29,6 +29,7 @@ const (
 )
 
 type Game struct {
+	screenBuffer  *ebiten.Image
 	width, height int //screen width and height
 	//global variables
 	gameMap   [][]int //game map 2d matrix
@@ -89,8 +90,15 @@ func (g *Game) Update() error {
 
 func (g *Game) Draw(screen *ebiten.Image) {
 
+	// # Screen buffer #
+	if g.screenBuffer == nil {
+		g.screenBuffer = ebiten.NewImage(g.width, g.height) // creating buffer if we don't have one
+	}
+	g.screenBuffer.Clear() //clearing previous screen to draw everything one more time
+
+	//###
 	//draw map background
-	ebitenutil.DrawRect(screen, g.mapPos.x, g.mapPos.y, mW, mH, color.RGBA{50, 50, 50, 255} /*Grey*/)
+	ebitenutil.DrawRect(g.screenBuffer, g.mapPos.x, g.mapPos.y, mW, mH, color.RGBA{50, 50, 50, 255} /*Grey*/)
 
 	//draw map cells
 	for i := range g.gameMap { //for each column
@@ -99,17 +107,17 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 			//If current cell is wall
 			if g.gameMap[i][j] == 1 {
-				drawCell(screen, g.mapPos, i, j, color.RGBA{200, 200, 200, 255} /*Light grey*/)
+				drawCell(g.screenBuffer, g.mapPos, i, j, color.RGBA{200, 200, 200, 255} /*Light grey*/)
 
 			} else if g.gameMap[i][j] == 2 {
-				drawCell(screen, g.mapPos, i, j, color.RGBA{255, 0, 0, 255} /*Red*/)
+				drawCell(g.screenBuffer, g.mapPos, i, j, color.RGBA{255, 0, 0, 255} /*Red*/)
 			}
 
 		}
 	}
 
 	//Draw player
-	ebitenutil.DrawCircle(screen, g.playerPos.x, g.playerPos.y, playerCol, color.RGBA{100, 180, 255, 255} /*Light blue*/)
+	ebitenutil.DrawCircle(g.screenBuffer, g.playerPos.x, g.playerPos.y, playerCol, color.RGBA{100, 180, 255, 255} /*Light blue*/)
 
 	//# FIELD OF VIEW #
 
@@ -129,19 +137,26 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		r.y = (camPlane.a.y + (segLenY * i))
 		r = norm(r) //ray unit vector
 
-		res := g.DDA(r)                                                                                                                               //calculate ray length
-		ebitenutil.DrawLine(screen, g.playerPos.x, g.playerPos.y, g.playerPos.x+res.x, g.playerPos.y+res.y, color.RGBA{242, 207, 85, 200} /*Yellow*/) //draw ray
+		res := g.DDA(r)                                                                                                                                       //calculate ray length
+		ebitenutil.DrawLine(g.screenBuffer, g.playerPos.x, g.playerPos.y, g.playerPos.x+res.x, g.playerPos.y+res.y, color.RGBA{242, 207, 85, 200} /*Yellow*/) //draw ray
 	}
 
 	//player's location in map
 	//fmt.Println(divide(subtract(g.playerPos, g.mapPos), cellSize))
 
 	//player view line drawing
-	ebitenutil.DrawLine(screen, g.playerPos.x, g.playerPos.y, g.playerPos.x+g.viewDir.x, g.playerPos.y+g.viewDir.y, color.RGBA{255, 146, 28, 200} /*Orange*/)
+	ebitenutil.DrawLine(g.screenBuffer, g.playerPos.x, g.playerPos.y, g.playerPos.x+g.viewDir.x, g.playerPos.y+g.viewDir.y, color.RGBA{255, 146, 28, 200} /*Orange*/)
 
 	//camera plane line drawing
-	ebitenutil.DrawLine(screen, g.playerPos.x+camPlane.a.x, g.playerPos.y+camPlane.a.y, g.playerPos.x+camPlane.b.x, g.playerPos.y+camPlane.b.y, color.RGBA{132, 132, 255, 200} /*Blue*/)
+	ebitenutil.DrawLine(g.screenBuffer, g.playerPos.x+camPlane.a.x, g.playerPos.y+camPlane.a.y, g.playerPos.x+camPlane.b.x, g.playerPos.y+camPlane.b.y, color.RGBA{132, 132, 255, 200} /*Blue*/)
 	//adding player position to convert from player coordinates to world coordinates
+
+	//###
+	// # Drawing screen buffer #
+	var opts ebiten.DrawImageOptions                                                        //declaring screen operations
+	opts.GeoM.Translate(-g.playerPos.x, -g.playerPos.y)                                     // moving screen to player's position
+	opts.GeoM.Translate(float64(screen.Bounds().Max.X)/2, float64(screen.Bounds().Max.Y)/2) //centering the screen
+	screen.DrawImage(g.screenBuffer, &opts)                                                 //Drawing screen buffer
 
 }
 
