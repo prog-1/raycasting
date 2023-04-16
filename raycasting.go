@@ -9,7 +9,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
 
-//-------------------------Copyright---------------------------------
+//-----------------------Copyright-Notice----------------------------
 /*
 	Copyright (c) 2023 Vladimir Stukalov
 	All right reserved.
@@ -54,26 +54,25 @@ func (g *Game) Update() error {
 	//Player WASD Movement
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
 		//collision handling
-		if nextPos := add(g.playerPos, divide(g.viewDir, viewLen/playerCol)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 { //if next position of the player is not the wall
+		if nextPos := add(g.playerPos, multiply(g.viewDir, playerCol)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 { //if next position of the player is not the wall
 			//g.playerPos = add(g.playerPos, divide(g.viewDir, viewLen))
-			g.playerPos = add(g.playerPos, norm(g.viewDir))
+			g.playerPos = add(g.playerPos, g.viewDir)
 			//adding viewDir to playerPos to move forward on 1 pixel
-			//normalizing viewDir to gain unit vector
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		if nextPos := subtract(g.playerPos, divide(g.viewDir, viewLen/playerCol)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 {
-			g.playerPos = subtract(g.playerPos, norm(g.viewDir)) //same as W, but subtracting viewDir
+		if nextPos := subtract(g.playerPos, multiply(g.viewDir, playerCol)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 {
+			g.playerPos = subtract(g.playerPos, g.viewDir) //same as W, but subtracting viewDir
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		if nextPos := add(g.playerPos, rotate(divide(g.viewDir, viewLen/playerCol), -math.Pi/2)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 {
-			g.playerPos = add(g.playerPos, rotate(norm(g.viewDir), -math.Pi/2)) //rotating on 90 before adding
+		if nextPos := add(g.playerPos, rotate(multiply(g.viewDir, playerCol), -math.Pi/2)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 {
+			g.playerPos = add(g.playerPos, rotate(g.viewDir, -math.Pi/2)) //rotating on 90 before adding
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		if nextPos := add(g.playerPos, rotate(divide(g.viewDir, viewLen/playerCol), math.Pi/2)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 {
-			g.playerPos = add(g.playerPos, rotate(norm(g.viewDir), math.Pi/2)) //rotating on -90 before adding
+		if nextPos := add(g.playerPos, rotate(multiply(g.viewDir, playerCol), math.Pi/2)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 {
+			g.playerPos = add(g.playerPos, rotate(g.viewDir, math.Pi/2)) //rotating on -90 before adding
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) {
@@ -121,9 +120,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	//# FIELD OF VIEW #
 
-	camA := add(g.viewDir, rotate(g.viewDir, -math.Pi/2)) //first camera point
-	camB := add(g.viewDir, rotate(g.viewDir, math.Pi/2))  //last camera point
-	camPlane := line{camA, camB}                          //camera plane line
+	camA := add(multiply(g.viewDir, viewLen), rotate(multiply(g.viewDir, viewLen), math.Pi/2))  //first camera point
+	camB := add(multiply(g.viewDir, viewLen), rotate(multiply(g.viewDir, viewLen), -math.Pi/2)) //last camera point
+	camPlane := line{camA, camB}                                                                //camera plane line
 
 	//# Ray Drawing #
 	//segment length for each projection
@@ -145,18 +144,37 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	//fmt.Println(divide(subtract(g.playerPos, g.mapPos), cellSize))
 
 	//player view line drawing
-	ebitenutil.DrawLine(g.screenBuffer, g.playerPos.x, g.playerPos.y, g.playerPos.x+g.viewDir.x, g.playerPos.y+g.viewDir.y, color.RGBA{255, 146, 28, 200} /*Orange*/)
+	ebitenutil.DrawLine(g.screenBuffer, g.playerPos.x, g.playerPos.y, g.playerPos.x+multiply(g.viewDir, viewLen).x, g.playerPos.y+multiply(g.viewDir, viewLen).y, color.RGBA{255, 146, 28, 200} /*Orange*/)
 
 	//camera plane line drawing
 	ebitenutil.DrawLine(g.screenBuffer, g.playerPos.x+camPlane.a.x, g.playerPos.y+camPlane.a.y, g.playerPos.x+camPlane.b.x, g.playerPos.y+camPlane.b.y, color.RGBA{132, 132, 255, 200} /*Blue*/)
 	//adding player position to convert from player coordinates to world coordinates
 
 	//###
-	// # Drawing screen buffer #
-	var opts ebiten.DrawImageOptions                                                        //declaring screen operations
-	opts.GeoM.Translate(-g.playerPos.x, -g.playerPos.y)                                     // moving screen to player's position
+	// # DRAWING SCREEN #
+	var opts ebiten.DrawImageOptions                    //declaring screen operations
+	opts.GeoM.Translate(-g.playerPos.x, -g.playerPos.y) // converting screen world coordinates to player's coordinates
+
+	//rotation
+	var m ebiten.GeoM //declaring matrix
+	/*
+		00 10
+		a  b
+		01 11
+		c  d
+	*/
+	//setting matrix
+	//90° rotation = [x,y] -> [-y,x]
+	m.SetElement(0, 0, -g.viewDir.y) //a (-| viewdir.x)
+	m.SetElement(0, 1, g.viewDir.x)  //b (-| viewdir.y)
+	m.SetElement(1, 0, g.viewDir.x)  //c (viewdir.x)
+	m.SetElement(1, 1, g.viewDir.y)  //d (viewdir.y)
+	m.Invert()                       //taking inverse matrix
+	opts.GeoM.Concat(m)              //multiplying "opts matrix" with "our matrix"
+	opts.GeoM.Scale(1, -1)           // scaling matrix for proper player movement & rotation
+
 	opts.GeoM.Translate(float64(screen.Bounds().Max.X)/2, float64(screen.Bounds().Max.Y)/2) //centering the screen
-	screen.DrawImage(g.screenBuffer, &opts)                                                 //Drawing screen buffer
+	screen.DrawImage(g.screenBuffer, &opts)                                                 //drawing screen buffer
 
 }
 
@@ -356,7 +374,7 @@ func NewGame(width, height int) *Game {
 
 	mapPos := vector{(sW / 2) - (mW / 2), (sH / 2) - (mH / 2)} // map position
 	playerStartPos := vector{(sW / 2) - 10, (sH / 2) - 10}     //player initial position
-	playerDir := vector{0, -viewLen}                           //player view direction
+	viewDir := vector{0, -1 /*prev: -viewLen*/}                //player view direction unit vector
 
-	return &Game{width: width, height: height, gameMap: initGameMap(), mapPos: mapPos, playerPos: playerStartPos, viewDir: playerDir /*camPlane: camPlane*/}
+	return &Game{width: width, height: height, gameMap: initGameMap(), mapPos: mapPos, playerPos: playerStartPos, viewDir: viewDir /*camPlane: camPlane*/}
 }
