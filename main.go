@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"image/color"
 	"log"
 	"math"
@@ -15,7 +14,7 @@ import (
 const (
 	sw, sh = 1920, 1080 // screen width and height(in pixels)
 	ms     = 500        // map width/height(width=height)(in pixels)
-	cc     = 7          // cell count in row/column(row=column)
+	cc     = 5          // cell count in row/column(row=column)
 )
 
 type Pair[T, U any] struct {
@@ -52,13 +51,11 @@ func NewGame() *game {
 	// 9 - player spawn
 	// NOTE: Maze must have player spawn walls along the perimeter
 	maze = &[cc][cc]int{
-		{1, 1, 1, 1, 1, 1, 1},
-		{1, 0, 0, 0, 0, 0, 1},
-		{1, 0, 0, 0, 0, 0, 1},
-		{1, 0, 0, 0, 0, 0, 1},
-		{1, 0, 0, 0, 0, 0, 1},
-		{1, 9, 0, 0, 0, 0, 1},
-		{2, 1, 1, 1, 1, 1, 1},
+		{1, 1, 1, 1, 1},
+		{1, 0, 0, 0, 1},
+		{1, 0, 0, 0, 1},
+		{1, 9, 0, 0, 1},
+		{2, 1, 1, 1, 1},
 	}
 	FlipMazeVertically := func(m *[cc][cc]int) *[cc][cc]int {
 		m2 := *m
@@ -95,7 +92,7 @@ func NewGame() *game {
 		return Player{
 			Pos: &vector2.Vector2{X: float64(x) + 0.5, Y: float64(y) + 0.5},
 			Dir: &vector2.Vector2{X: 1, Y: 0},
-			ms:  0.2, rs: 0.0025,
+			ms:  0.2, rs: 0.00125,
 			l: 1, w: 1}
 	}
 	return &game{
@@ -188,24 +185,25 @@ func (g *game) Draw(screen *ebiten.Image) {
 	drawLine(g.P.Pos, g.P.Pos.Add(g.P.Dir), color.White)
 
 	// Rays:
-	g.P.Pos = &vector2.Vector2{X: 1, Y: 1}
-	g.P.Dir = &vector2.Vector2{X: 0.6, Y: 0.8}
+	g.P.Pos = &vector2.Vector2{X: 3.5, Y: 3.5}
+	g.P.Dir = &vector2.Vector2{X: -0.6, Y: -0.8}
 	l := GetRayLengthToIntersection(*g.P.Pos, *g.P.Dir, *g.Maze)
-	fmt.Println(l)
+	// fmt.Println(l)
 	drawLine(g.P.Pos, g.P.Pos.Add(g.P.Dir.MulScalar(l)), color.RGBA{0, 0, 255, 255})
 
 	// Screen manipulations:
 	opts := ebiten.DrawImageOptions{}
-	p := ebiten.GeoM{}
-	opts.GeoM.Translate(-g.P.Pos.X*cs, -g.P.Pos.Y*cs) // Translation: World -> Player local
-	// x, y rotated by 90 deg. = -y,x
-	p.SetElement(0, 0, -g.P.Dir.Y) // p1.X
-	p.SetElement(0, 1, g.P.Dir.X)  // p1.Y
-	p.SetElement(1, 0, g.P.Dir.X)  // p2.X
-	p.SetElement(1, 1, g.P.Dir.Y)  // p2.Y
-	p.Invert()
-	opts.GeoM.Concat(p)                                                                     // Multiplication
-	opts.GeoM.Scale(-1, -1)                                                                 // Flipping along OX
+	//p := ebiten.GeoM{}
+	//opts.GeoM.Translate(-g.P.Pos.X*cs, -g.P.Pos.Y*cs) // Translation: World -> Player local
+	//// x, y rotated by 90 deg. = -y,x
+	//p.SetElement(0, 0, -g.P.Dir.Y) // p1.X
+	//p.SetElement(0, 1, g.P.Dir.X)  // p1.Y
+	//p.SetElement(1, 0, g.P.Dir.X)  // p2.X
+	//p.SetElement(1, 1, g.P.Dir.Y)  // p2.Y
+	//p.Invert()
+	//opts.GeoM.Concat(p)                                                                     // Multiplication
+	//opts.GeoM.Scale(-1, -1)                                                                 // Flipping
+	opts.GeoM.Scale(1, -1)
 	opts.GeoM.Translate(float64(screen.Bounds().Max.X/2), float64(screen.Bounds().Max.Y/2)) // Moving coord. center to screen center
 	screen.DrawImage(g.sb, &opts)
 	g.sb.Clear()
