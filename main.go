@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"image/color"
 	"log"
 	"math"
@@ -14,7 +15,7 @@ import (
 const (
 	sw, sh = 1920, 1080 // screen width and height(in pixels)
 	ms     = 500        // map width/height(width=height)(in pixels)
-	cc     = 4          // cell count in row/column(row=column)
+	cc     = 7          // cell count in row/column(row=column)
 )
 
 type Pair[T, U any] struct {
@@ -32,7 +33,7 @@ type Player struct {
 	Pos    *vector2.Vector2
 	Dir    *vector2.Vector2
 	ms, rs float64 // Movement and Rotation speed
-	l, h   int     // base length and height of player's FOV sector
+	l, w   int     // base length and width of player's FOV sector
 }
 
 type game struct {
@@ -44,19 +45,23 @@ type game struct {
 }
 
 func NewGame() *game {
+	var maze *[cc][cc]int
 	// Values in the maze:
 	// 0 - empty space
 	// 1 - pink wall
 	// 9 - player spawn
 	// NOTE: Maze must have player spawn walls along the perimeter
-	maze := [cc][cc]int{
-		{1, 1, 1, 1},
-		{1, 0, 0, 1},
-		{1, 9, 0, 1},
-		{2, 1, 1, 1},
+	maze = &[cc][cc]int{
+		{1, 1, 1, 1, 1, 1, 1},
+		{1, 0, 0, 0, 0, 0, 1},
+		{1, 0, 0, 0, 0, 0, 1},
+		{1, 0, 0, 0, 0, 0, 1},
+		{1, 0, 0, 0, 0, 0, 1},
+		{1, 9, 0, 0, 0, 0, 1},
+		{2, 1, 1, 1, 1, 1, 1},
 	}
-
-	FlipMazeVertically := func(m *[cc][cc]int) {
+	FlipMazeVertically := func(m *[cc][cc]int) *[cc][cc]int {
+		m2 := *m
 		swap := func(a, b *int) {
 			tmp := *a
 			*a = *b
@@ -65,11 +70,12 @@ func NewGame() *game {
 
 		for c := 0; c < cc/2; c++ {
 			for r := 0; r < cc/2; r++ {
-				swap(&m[r][c], &m[cc-r-1][c])
+				swap(&m2[r][c], &m2[cc-r-1][c])
 			}
 		}
+		return &m2
 	}
-	FlipMazeVertically(&maze)
+	maze = FlipMazeVertically(maze)
 
 	NewPlayer := func() Player {
 		var x, y int
@@ -90,10 +96,10 @@ func NewGame() *game {
 			Pos: &vector2.Vector2{X: float64(x) + 0.5, Y: float64(y) + 0.5},
 			Dir: &vector2.Vector2{X: 1, Y: 0},
 			ms:  0.2, rs: 0.0025,
-			l: 1, h: 1}
+			l: 1, w: 1}
 	}
 	return &game{
-		Maze: &maze,
+		Maze: maze,
 		P:    NewPlayer(),
 		RC:   101,
 		pft:  0,
@@ -181,6 +187,13 @@ func (g *game) Draw(screen *ebiten.Image) {
 	ebitenutil.DrawCircle(g.sb, g.P.Pos.X*cs, g.P.Pos.Y*cs, 10, color.White)
 	drawLine(g.P.Pos, g.P.Pos.Add(g.P.Dir), color.White)
 
+	// Rays:
+	g.P.Pos = &vector2.Vector2{X: 1, Y: 1}
+	g.P.Dir = &vector2.Vector2{X: 0.6, Y: 0.8}
+	l := GetRayLengthToIntersection(*g.P.Pos, *g.P.Dir, *g.Maze)
+	fmt.Println(l)
+	drawLine(g.P.Pos, g.P.Pos.Add(g.P.Dir.MulScalar(l)), color.RGBA{0, 0, 255, 255})
+
 	// Screen manipulations:
 	opts := ebiten.DrawImageOptions{}
 	p := ebiten.GeoM{}
@@ -198,10 +211,62 @@ func (g *game) Draw(screen *ebiten.Image) {
 	g.sb.Clear()
 }
 
+// Returns length of the ray casted from the point p in the direction of d to the wall in the map m
+func GetRayLengthToIntersection(p, d vector2.Vector2, m [cc][cc]int) float64 {
+	d = *d.Normalize()
+	mod := func(a float64) float64 {
+		if a > 0 {
+			return a
+		} else {
+			return -a
+		}
+	}
+	frac := func(a float64) float64 {
+		return a - float64(int(a))
+	}
+
+	var l vector2.Vector2     // Total line length from stepping to the neighbors along OX and OY
+	var k1 vector2.Vector2    // Distance to the nearest neighbor along OX and OY, which we can express using starting point coordinates(p.X and P.Y)
+	tg := mod(d.Y) / mod(d.X) // tangent of the angle between lx or ly and frac(k.X) or frac(k.Y)
+	var ms Pair[int, int]     // maze step(+1 or -1)
+	if d.X > 0 {
+		ms.X = 1
+		k1.X = 1 - frac(p.X)
+	} else {
+		ms.X = -1
+		k1.X = frac(p.X)
+	}
+	if d.Y > 0 {
+		ms.Y = 1
+		k1.Y = 1 - frac(p.Y)
+	} else {
+		ms.Y = -1
+		k1.Y = frac(p.Y)
+	}
+	k2 := vector2.Vector2{X: k1.X * tg, Y: k1.Y / tg}                                 // tg = y/x => y = xtg, x = y/tg
+	l.X, l.Y = math.Sqrt(k1.X*k1.X+k2.X*k2.X), math.Sqrt(k1.Y*k1.Y+k2.Y*k2.Y)         // Ray's length from p to intersection point with the nearest neighbor along OX and OY
+	step := vector2.Vector2{X: math.Sqrt(1 + k2.X*k2.X), Y: math.Sqrt(1 + k2.Y*k2.Y)} // Ray's length from the current intersection point to another along OX and OY
+	var len float64                                                                   // Ray's length to the intersection point with the wall
+	c := Pair[int, int]{int(p.X), int(p.Y)}                                           // current cell
+	for m[int(c.X)][int(c.Y)] == 0 /*empty*/ || m[int(c.X)][int(c.Y)] == 9 /*player spawning point*/ {
+		if l.X < l.Y {
+			len = l.X
+			l.X += step.X
+			c.X += ms.X
+		} else {
+			len = l.Y
+			l.Y += step.Y
+			c.Y += ms.Y
+		}
+	}
+	return len
+}
+
 func main() {
 	ebiten.SetWindowSize(sw, sh)
 
 	g := NewGame()
+	g.P.Dir = RotateZ(g.P.Dir, math.Pi)
 	if err := ebiten.RunGame(g); err != nil {
 		log.Fatal(err)
 	}
