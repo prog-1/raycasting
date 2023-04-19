@@ -136,7 +136,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		r.y = (camPlane.a.y + (segLenY * i))
 		r = norm(r) //ray unit vector
 
-		res := g.DDA(r)                                                                                                                                       //calculate ray length
+		res := multiply(r, g.DDA(r))                                                                                                                          //calculate ray length
 		ebitenutil.DrawLine(g.screenBuffer, g.playerPos.x, g.playerPos.y, g.playerPos.x+res.x, g.playerPos.y+res.y, color.RGBA{242, 207, 85, 200} /*Yellow*/) //draw ray
 	}
 
@@ -152,29 +152,30 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	//###
 	// # DRAWING SCREEN #
-	var opts ebiten.DrawImageOptions                    //declaring screen operations
-	opts.GeoM.Translate(-g.playerPos.x, -g.playerPos.y) // converting screen world coordinates to player's coordinates
+	// var opts ebiten.DrawImageOptions                    //declaring screen operations
+	// opts.GeoM.Translate(-g.playerPos.x, -g.playerPos.y) // converting screen world coordinates to player's coordinates
 
-	//rotation
-	var m ebiten.GeoM //declaring matrix
-	/*
-		00 10
-		a  b
-		01 11
-		c  d
-	*/
-	//setting matrix
-	//90° rotation = [x,y] -> [-y,x]
-	m.SetElement(0, 0, -g.viewDir.y) //a (-| viewdir.x)
-	m.SetElement(0, 1, g.viewDir.x)  //b (-| viewdir.y)
-	m.SetElement(1, 0, g.viewDir.x)  //c (viewdir.x)
-	m.SetElement(1, 1, g.viewDir.y)  //d (viewdir.y)
-	m.Invert()                       //taking inverse matrix
-	opts.GeoM.Concat(m)              //multiplying "opts matrix" with "our matrix"
-	opts.GeoM.Scale(1, -1)           // scaling matrix for proper player movement & rotation
+	// //rotation
+	// var m ebiten.GeoM //declaring matrix
+	// /*
+	// 	00 10
+	// 	a  b
+	// 	01 11
+	// 	c  d
+	// */
+	// //setting matrix
+	// //90° rotation = [x,y] -> [-y,x]
+	// m.SetElement(0, 0, -g.viewDir.y) //a (-| viewdir.x)
+	// m.SetElement(0, 1, g.viewDir.x)  //b (-| viewdir.y)
+	// m.SetElement(1, 0, g.viewDir.x)  //c (viewdir.x)
+	// m.SetElement(1, 1, g.viewDir.y)  //d (viewdir.y)
+	// m.Invert()                       //taking inverse matrix
+	// opts.GeoM.Concat(m)              //multiplying "opts matrix" with "our matrix"
+	// opts.GeoM.Scale(1, -1)           // scaling matrix for proper player movement & rotation
 
-	opts.GeoM.Translate(float64(screen.Bounds().Max.X)/2, float64(screen.Bounds().Max.Y)/2) //centering the screen
-	screen.DrawImage(g.screenBuffer, &opts)                                                 //drawing screen buffer
+	// opts.GeoM.Translate(float64(screen.Bounds().Max.X)/2, float64(screen.Bounds().Max.Y)/2) //centering the screen
+	//screen.DrawImage(g.screenBuffer, &opts)                                                 //drawing screen buffer
+	screen.DrawImage(g.screenBuffer, nil) //drawing screen buffer
 
 }
 
@@ -182,87 +183,46 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 //DDA - calculates length of the ray
 //inputs unit (direction) vector.
-//outputs vector in player's coord
-func (g Game) DDA(v vector) (res vector) {
-
-	initV := v
-
-	k := v.y / v.x
-
-	var signX, signY float64
-	if v.x < 0 { //if vector's x in player coord is negative
-		signX = -1
+//outputs length of the ray
+func (g Game) DDA(v vector) (len float64) {
+	pmp := divide(subtract(g.playerPos, g.mapPos), cellSize) //player map position
+	var frac vector                                          //fraction from player's position in cell
+	frac.x = pmp.x - float64(int(pmp.x))
+	frac.y = pmp.y - float64(int(pmp.y))
+	var curCell vector //current cell (variable "map")
+	curCell.x = pmp.x - frac.x
+	curCell.y = pmp.y - frac.y
+	var mapd vector //step where to go on each direction
+	if v.x < 0 {
+		mapd.x = -1
 	} else {
-		signX = 1
+		mapd.x = 1
 	}
-	if v.y < 0 { //if vector's x in player coord is negative
-		signY = -1
+	if v.y < 0 {
+		mapd.y = -1
 	} else {
-		signY = 1
+		curCell.y = 1
 	}
+	var step vector                                                          //distance to row and column of ray in cell
+	step.x = cellSize * math.Sqrt(1+(v.y/v.x)*(v.y/v.x))                     // √ 1^2 + k^2
+	step.y = cellSize * math.Sqrt(1+(v.x/v.y)*(v.x/v.y))                     // √ 1^2 + (1/k)^2
+	var dist vector                                                          //initial distance to first row and column
+	dist.x = cellSize * math.Sqrt((1-frac.x)*(1-frac.x)+(v.y/v.x)*(v.y/v.x)) // √ (1-frac.x)^2 + k^2
+	dist.y = cellSize * math.Sqrt((1-frac.y)*(1-frac.y)+(v.x/v.y)*(v.x/v.y)) // √ (1-frac.y)^2 + (1/k)^2
 
-	pi := divide(subtract(g.playerPos, g.mapPos), cellSize) // position index
-
-	fi := subtract(pi, vector{float64(int(pi.x)), float64(int(pi.y))}) // fraction index
-
-	/*
-		PLAN:
-		length from pp to y edge
-		length from pp to x edge
-		choose which is shorter
-		make pythagor to find length
-		repeat
-
-		but it's not working normally ;(
-	*/
-
-	var rayLen float64 //length of the ray
-
-	// Start iteration
-	A := fi.x * cellSize
-	B := fi.y * cellSize
-
-	fx := A * k
-	fy := B / k
-
-	lx := math.Sqrt((A * A) + (fx * fx))
-	ly := math.Sqrt((B * B) + (fy * fy))
-
-	if lx < ly {
-		v = add(v, vector{lx, lx})
-		rayLen += lx
-		ly -= lx
-		lx = math.Sqrt(1 + k*k) //calculating new lx
-		pi.x += 1 * signX
-	} else {
-		v = add(v, vector{ly, ly})
-		rayLen += ly
-		lx -= ly
-		ly = math.Sqrt(1 + 1/(k*k)) //calculating new ly
-		pi.y += 1 * signY
-	}
-
-	wall := g.gameMap[int(pi.y)][int(pi.x)]
-
-	for wall == 0 {
-		// Following iterations
-		if lx < ly { //for X edge
-			v = multiply(add(v, vector{lx, lx}), signX) //adding length to vector
-			rayLen += lx                                //increasing our length
-			ly -= lx                                    //substracting our ly to match current position
-			lx = math.Sqrt(1 + k*k)                     //calculating new lx
-			pi.x += 1 * signX
-		} else { // for Y edge
-			v = multiply(add(v, vector{ly, ly}), signY)
-			rayLen += ly                //increasing our length
-			lx -= ly                    //substracting lx to match current position
-			ly = math.Sqrt(1 + 1/(k*k)) //calculating new ly
-			pi.y += 1 * signY
+	for g.gameMap[int(curCell.x)][int(curCell.y)] == 0 {
+		if dist.x < dist.y {
+			len = dist.x
+			dist.x += step.x
+			curCell.x += mapd.x
+		} else /* dist.x >= dist.y */ {
+			len = dist.y
+			dist.y += step.y
+			curCell.y += mapd.y
 		}
-		wall = g.gameMap[int(pi.y)][int(pi.x)]
 	}
 
-	return multiply(initV, rayLen) //make final vector
+	return len
 }
 
 //normalize - converts vector to unit vector
