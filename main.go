@@ -46,6 +46,25 @@ func (g *Game) Layout(outWidth, outHeight int) (w, h int) {
 	return g.width, g.height
 }
 
+func (g *Game)startDists(ray, dot Point, deltaX, deltaY float64)(int, int, float64, float64){
+	stepX, stepY, sideX, sideY := 0, 0, 0.0, 0.0
+	if ray.x < 0{
+		stepX = -1
+		sideX = (g.player.x/float64(g.mazeScale) - dot.x) * deltaX
+	}else{
+		stepX = 1
+		sideX = (dot.x + 1.0 - g.player.x/float64(g.mazeScale)) * deltaX
+	}
+	if ray.y < 0{
+		stepY = -1
+		sideY = (g.player.y/float64(g.mazeScale) - dot.y) * deltaY
+	}else{
+		stepY = 1
+		sideY = (dot.y + 1.0 - g.player.y/float64(g.mazeScale)) * deltaY
+	}
+	return stepX, stepY, sideX, sideY
+}
+
 func (g *Game) Update() error {
 	if ebiten.IsKeyPressed(ebiten.KeyW) && g.maze[int(g.player.y+g.playerEyesDir.y)/g.mazeScale][int(g.player.x+g.playerEyesDir.x)/g.mazeScale] == 0 {
 		g.player.x = g.player.x + g.playerEyesDir.x
@@ -101,14 +120,24 @@ func (g *Game) DrawPlayer(screen *ebiten.Image) {
 }
 
 func (g *Game) DrawFov(screen *ebiten.Image) {
-	a, b := sub(g.playerEyesDir, g.fov), sum(g.playerEyesDir, g.fov)
+	ray, b := sub(g.fov,g.playerEyesDir), sum( g.fov,g.playerEyesDir)
 	for i := 0; i < 100; i++ {
-		ray := Point{g.player.x, g.player.y}
-		for g.maze[int((ray.y+a.y))/g.mazeScale][int((ray.x+a.x))/g.mazeScale] == 0{
-			ray.x, ray.y = ray.x+a.x, ray.y+a.y
+		dot := Point{math.Floor(g.player.x)/float64(g.mazeScale), math.Floor(g.player.y)/float64(g.mazeScale)}
+		deltaDistX, deltaDistY := float64(math.Abs(1/ray.x))/float64(g.mazeScale), float64(math.Abs(1/ray.y))/float64(g.mazeScale)
+		stepX, stepY, sideDistX, sideDistY := g.startDists(ray, dot, deltaDistX, deltaDistY)
+
+		
+	for g.maze[int(dot.x)][int(dot.y)]!=0{
+		if sideDistX < sideDistY{
+			sideDistX+=deltaDistX
+			dot.x += float64(stepX)
+		}else{
+			sideDistY+=deltaDistY
+			dot.y += float64(stepY)
 		}
-		vector.StrokeLine(screen, float32(g.player.x), float32(g.player.y), float32(ray.x), float32(ray.y), 1, color.RGBA{255, 255, 0, 255}, false)
-		a.x, a.y = a.x+b.x/100, a.y+b.y/100
+	}
+	vector.StrokeLine(screen,float32(g.player.x), float32(g.player.y), float32(dot.x),float32(dot.y), 1, color.RGBA{255, 255, 0, 255}, false)
+		ray.x, ray.y = ray.x+b.x/100, ray.y+b.y/100
 	}
 }
 
