@@ -23,7 +23,7 @@ type Point struct {
 type Game struct {
 	width, height int
 	maze          [][]int
-	wallColors 	map[int]color.RGBA
+	wallColors    map[int]color.RGBA
 	mazeScale     int
 	player        Point
 	playerEyesDir Point
@@ -39,28 +39,27 @@ func sub(a, b Point) Point {
 }
 
 func rotate(p Point, angle float64) Point {
-	return Point{p.x*math.Cos(angle) - p.y*math.Sin(angle),  p.x*math.Sin(angle) + p.y*math.Cos(angle)}
+	return Point{p.x*math.Cos(angle) - p.y*math.Sin(angle), p.x*math.Sin(angle) + p.y*math.Cos(angle)}
 }
 
 func (g *Game) Layout(outWidth, outHeight int) (w, h int) {
 	return g.width, g.height
 }
 
-func (g *Game)startDists(ray, dot Point, deltaX, deltaY float64)(int, int, float64, float64){
-	stepX, stepY, sideX, sideY := 0, 0, 0.0, 0.0
-	if ray.x < 0{
+func (g *Game) startDists(ray, dot Point, deltaX, deltaY float64) (stepX int, stepY int, sideX float64, sideY float64) {
+	if ray.x < 0 {
 		stepX = -1
-		sideX = (g.player.x/float64(g.mazeScale) - dot.x) * deltaX
-	}else{
+		sideX = (g.player.x - dot.x) * deltaX
+	} else {
 		stepX = 1
-		sideX = (dot.x + 1.0 - g.player.x/float64(g.mazeScale)) * deltaX
+		sideX = (dot.x + 1.0 - g.player.x) * deltaX
 	}
-	if ray.y < 0{
+	if ray.y < 0 {
 		stepY = -1
-		sideY = (g.player.y/float64(g.mazeScale) - dot.y) * deltaY
-	}else{
+		sideY = (g.player.y - dot.y) * deltaY
+	} else {
 		stepY = 1
-		sideY = (dot.y + 1.0 - g.player.y/float64(g.mazeScale)) * deltaY
+		sideY = (dot.y + 1.0 - g.player.y) * deltaY
 	}
 	return stepX, stepY, sideX, sideY
 }
@@ -120,24 +119,29 @@ func (g *Game) DrawPlayer(screen *ebiten.Image) {
 }
 
 func (g *Game) DrawFov(screen *ebiten.Image) {
-	ray, b := sub(g.fov,g.playerEyesDir), sum( g.fov,g.playerEyesDir)
-	for i := 0; i < 100; i++ {
-		dot := Point{math.Floor(g.player.x)/float64(g.mazeScale), math.Floor(g.player.y)/float64(g.mazeScale)}
-		deltaDistX, deltaDistY := float64(math.Abs(1/ray.x))/float64(g.mazeScale), float64(math.Abs(1/ray.y))/float64(g.mazeScale)
+	for i := 0.0; i < screenWidth; i++ {
+		var dist float64
+		cameraX := 2*i/float64(screenWidth) - 1
+		ray := Point{g.playerEyesDir.x + g.fov.x*cameraX, g.playerEyesDir.y + g.fov.y*cameraX}
+		dot := Point{math.Floor(g.player.x), math.Floor(g.player.y)}
+		deltaDistX, deltaDistY := float64(math.Abs(1/ray.x)), float64(math.Abs(1/ray.y))
 		stepX, stepY, sideDistX, sideDistY := g.startDists(ray, dot, deltaDistX, deltaDistY)
 
-		
-	for g.maze[int(dot.x)][int(dot.y)]!=0{
-		if sideDistX < sideDistY{
-			sideDistX+=deltaDistX
-			dot.x += float64(stepX)
-		}else{
-			sideDistY+=deltaDistY
-			dot.y += float64(stepY)
+		for g.maze[int(dot.y)/g.mazeScale][int(dot.x)/g.mazeScale] == 0 {
+			if sideDistX < sideDistY {
+				sideDistX += deltaDistX
+				dot.x += float64(stepX)
+				dist += deltaDistX
+			} else {
+				sideDistY += deltaDistY
+				dot.y += float64(stepY)
+				dist += deltaDistY
+			}
 		}
-	}
-	vector.StrokeLine(screen,float32(g.player.x), float32(g.player.y), float32(dot.x),float32(dot.y), 1, color.RGBA{255, 255, 0, 255}, false)
-		ray.x, ray.y = ray.x+b.x/100, ray.y+b.y/100
+		vector.StrokeLine(screen, float32(g.player.x), float32(g.player.y), float32(dot.x), float32(dot.y), 1, color.RGBA{255, 255, 0, 255}, false)
+		wh := screenHeight / dist
+		vector.StrokeLine(screen, float32(i), float32(screenHeight/2), float32(i), float32(screenHeight/2+wh/2), 1, color.RGBA{255, 255, 0, 200}, false)
+		vector.StrokeLine(screen, float32(i), float32(screenHeight/2), float32(i), float32(screenHeight/2-wh/2), 1, color.RGBA{255, 255, 0, 200}, false)
 	}
 }
 
