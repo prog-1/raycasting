@@ -182,8 +182,43 @@ func (g *Game) DrawMinimap(screen *ebiten.Image) {
 	f_1.Invert()
 	opts.GeoM.Concat(f_1)
 	opts.GeoM.Scale(1, -1)
-	opts.GeoM.Translate(float64(g.minimap.Bounds().Dx())/2+5, float64(g.minimap.Bounds().Dy())/2+5)
+	opts.GeoM.Translate(float64(g.minimap.Bounds().Dx())/2+4, float64(g.minimap.Bounds().Dy())/2+4)
+	g.DrawRays()
 	screen.DrawImage(g.minimap, &opts)
+}
+
+func (g *Game) DrawRays() {
+	for i := 0.0; i < rayNum; i++ {
+		cameraX := 2*i/float64(rayNum) - 1
+		rayDir := Point{g.dir.x + g.plane.x*cameraX, g.dir.y + g.plane.y*cameraX}
+		p := Point{math.Floor(g.pos.x * cellSize), math.Floor(g.pos.y * cellSize)}
+		deltaDist := Point{math.Abs(1 / rayDir.x), math.Abs(1 / rayDir.y)}
+		var sideDist, step Point
+		if rayDir.x < 0 {
+			step.x = -1
+			sideDist.x = (g.pos.x*cellSize - p.x) * deltaDist.x
+		} else {
+			step.x = 1
+			sideDist.x = (p.x + 1.0 - g.pos.x*cellSize) * deltaDist.x
+		}
+		if rayDir.y < 0 {
+			step.y = -1
+			sideDist.y = (g.pos.y*cellSize - p.y) * deltaDist.y
+		} else {
+			step.y = 1
+			sideDist.y = (p.y + 1.0 - g.pos.y*cellSize) * deltaDist.y
+		}
+		for worldMap[int(p.y)/cellSize][int(p.x)/cellSize] == 0 {
+			if sideDist.x < sideDist.y {
+				sideDist.x += deltaDist.x
+				p.x += step.x
+			} else {
+				sideDist.y += deltaDist.y
+				p.y += step.y
+			}
+			g.minimap.Set(int(p.x), int(p.y), color.RGBA{255, 255, 0, 50})
+		}
+	}
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
@@ -272,37 +307,6 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 	g.DrawMinimap(screen)
 	vector.DrawFilledCircle(screen, float32(13)*cellSize, float32(13)*cellSize, 3, color.RGBA{255, 255, 0, 150}, false)
-	for i := 0.0; i < rayNum; i++ {
-		cameraX := 2*i/float64(rayNum) - 1
-		rayDir := Point{g.dir.x + g.plane.x*cameraX, g.dir.y + g.plane.y*cameraX}
-		p := Point{math.Floor(g.pos.x) * cellSize, math.Floor(g.pos.y) * cellSize}
-		deltaDist := Point{math.Abs(1 / rayDir.x), math.Abs(1 / rayDir.y)}
-		var sideDist, step Point
-		if rayDir.x < 0 {
-			step.x = -1
-			sideDist.x = (g.pos.x*cellSize - p.x) * deltaDist.x
-		} else {
-			step.x = 1
-			sideDist.x = (p.x + 1.0 - g.pos.x*cellSize) * deltaDist.x
-		}
-		if rayDir.y < 0 {
-			step.y = -1
-			sideDist.y = (g.pos.y*cellSize - p.y) * deltaDist.y
-		} else {
-			step.y = 1
-			sideDist.y = (p.y + 1.0 - g.pos.y*cellSize) * deltaDist.y
-		}
-		for worldMap[int(p.y)/cellSize][int(p.x)/cellSize] == 0 {
-			if sideDist.x < sideDist.y {
-				sideDist.x += deltaDist.x
-				p.x += step.x
-			} else {
-				sideDist.y += deltaDist.y
-				p.y += step.y
-			}
-		}
-		vector.StrokeLine(screen, float32(13)*cellSize, float32(13)*cellSize, float32(p.x), float32(p.y), 3, color.RGBA{255, 255, 0, 50}, false)
-	}
 }
 
 func main() {
