@@ -117,7 +117,7 @@ func abs(a float64) float64 {
 	return a
 }
 
-func raycast(screen *ebiten.Image, pos Point, dirx, diry float64) int {
+func raycast(screen *ebiten.Image, pos Point, dirx, diry float64) (int, float64) {
 	mapX, mapY := int(pos.x), int(pos.y)
 
 	deltaDistX := abs(1 / dirx)
@@ -155,7 +155,7 @@ func raycast(screen *ebiten.Image, pos Point, dirx, diry float64) int {
 		if maze[mapY/int(oneBlockHeightLength)][mapX/int(oneBlockWidthLength)] > 0 {
 			ebitenutil.DrawLine(screen, pos.x, pos.y, float64(mapX), float64(mapY), color.RGBA{255, 255, 0, 255})
 
-			return side
+			return side, math.Sqrt(math.Pow(float64(mapX)-pos.x, 2) + math.Pow(float64(mapY)-pos.y, 2))
 		}
 	}
 }
@@ -165,14 +165,18 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	DrawMap(screen)
 
 	ebitenutil.DrawCircle(screen, g.pos.x, g.pos.y, 3, color.RGBA{255, 255, 0, 255})
-
+	m := float64(width) / 6100.0
+	var line float64
 	for i := -30.0; i < 31; i += 0.01 {
+
 		tmp := Rotate(g.dir, i*math.Pi/180)
 		// ebitenutil.DrawLine(screen, g.pos.x, g.pos.y, g.pos.x+tmp.x*1000, g.pos.y+tmp.y*1000, color.RGBA{255, 255, 0, 255})
-		raycast(screen, g.pos, tmp.x, tmp.y)
+		_, distance := raycast(screen, g.pos, tmp.x, tmp.y)
+		ebitenutil.DrawLine(screen, line, width/2, line, (width/2)+(width/2)/distance, color.RGBA{0, 255, 0, 255})
+		ebitenutil.DrawLine(screen, line, width/2, line, (width/2)-(width/2)/distance, color.RGBA{0, 255, 0, 255})
 
+		line += m
 	}
-
 	// ebitenutil.DrawRect(screen, float64(a*oneBlockWidthLength), float64(b*oneBlockHeightLength), float64(oneBlockWidthLength), float64(oneBlockHeightLength), color.RGBA{0, 0, 255, 255})
 }
 
