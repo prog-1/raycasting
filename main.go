@@ -25,6 +25,7 @@ type Game struct {
 	gameMap             [][]int
 	playerPos, dir, fov Point
 	colors              []color.Color
+	fisheye             bool
 }
 
 func rotate(a Point, ang float64) Point {
@@ -56,6 +57,9 @@ func (g *Game) Update() error {
 	if ebiten.IsKeyPressed(ebiten.KeyD) && g.gameMap[int(g.playerPos.y+g.dir.x/10)][int(g.playerPos.x-g.dir.y/10)] == 0 {
 		g.playerPos.x -= g.dir.y / 10
 		g.playerPos.y += g.dir.x / 10
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyX) {
+		g.fisheye = !g.fisheye
 	}
 	return nil
 }
@@ -91,7 +95,72 @@ func (g *Game) DrawFieldOfView(screen *ebiten.Image) {
 	}
 }
 
+func (g *Game) DrawWalls(screen *ebiten.Image) {
+	for i := 0; i < screenWidth; i++ {
+		cameraX := 2*float64(i)/float64(screenWidth) - 1
+		rayDirX, rayDirY := g.dir.x+g.fov.x*cameraX, g.dir.x+g.fov.y*cameraX
+		mapX, mapY := g.playerPos.x, g.playerPos.y
+		deltaDistX, deltaDistY := math.Abs(1/rayDirX), math.Abs(1/rayDirY)
+		var sideDistX, sideDistY, stepX, stepY, perpWallDist float64
+		var side int
+		hit := 0
+		if rayDirX < 0 {
+			stepX = -1
+			sideDistX = (g.playerPos.x - mapX) * deltaDistX
+		} else {
+			stepX = 1
+			sideDistX = (mapX + 1.0 - g.playerPos.x) * deltaDistX
+		}
+		if rayDirY < 0 {
+			stepY = -1
+			sideDistY = (g.playerPos.y - mapY) * deltaDistY
+		} else {
+			stepY = 1
+			sideDistY = (mapY + 1.0 - g.playerPos.y) * deltaDistY
+		}
+
+		for hit == 0 {
+			if sideDistX < sideDistY {
+				sideDistX += deltaDistX
+				mapX += stepX
+				side = 0
+			} else {
+				sideDistY += deltaDistY
+				mapY += stepY
+				side = 1
+			}
+			if g.gameMap[int(mapY)][int(mapX)] > 0 {
+				hit = 1
+			}
+		}
+		if side == 0 {
+			perpWallDist = sideDistX - deltaDistX
+		} else {
+			perpWallDist = sideDistY - deltaDistY
+		}
+		if g.fisheye {
+			perpWallDist = math.Sqrt(1 + math.Pow(math.Sqrt(math.Pow(rayDirX, 2)+math.Pow(rayDirY, 2)), 2))
+		}
+		lineHeight := int(float64(screenHeight) / perpWallDist)
+		drawStart := -lineHeight/2 + screenHeight/2
+		if drawStart < 0 {
+			drawStart = 0
+		}
+		drawEnd := lineHeight/2 + screenHeight/2
+		if drawEnd >= screenHeight {
+			drawEnd = screenHeight - 1
+		}
+		c := g.colors[g.gameMap[int(mapY)][int(mapX)]-1]
+		if side == 1 {
+			r, g, b, a := c.RGBA()
+			c = color.RGBA{uint8(float64(r>>8) * 0.3), uint8(float64(g>>8) * 0.3), uint8(float64(b>>8) * 0.3), uint8(float64(a >> 8))}
+		}
+		vector.StrokeLine(screen, float32(screenWidth-i), float32(drawStart), float32(screenWidth-i), float32(drawEnd), 3, c, false)
+	}
+}
+
 func (g *Game) Draw(screen *ebiten.Image) {
+	g.DrawWalls(screen)
 	for i := range g.gameMap {
 		for j := range g.gameMap[i] {
 			if g.gameMap[j][i] != 0 {
@@ -115,28 +184,30 @@ func NewGame(width, height int) *Game {
 			{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 1},
-			{1, 0, 0, 2, 0, 0, 0, 0, 2, 2, 0, 2, 2, 0, 0, 0, 0, 2, 0, 0, 0, 1},
-			{1, 0, 0, 2, 0, 3, 3, 0, 2, 0, 0, 0, 2, 0, 3, 3, 0, 2, 0, 0, 0, 1},
-			{1, 0, 0, 2, 0, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 0, 2, 0, 0, 0, 1},
-			{1, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 1},
-			{1, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 1},
-			{1, 0, 0, 2, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 2, 0, 0, 0, 1},
-			{1, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 1},
-			{1, 0, 0, 0, 2, 2, 0, 2, 2, 2, 2, 2, 2, 2, 0, 2, 2, 0, 0, 0, 0, 1},
-			{1, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 1},
-			{1, 0, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 0, 0, 0, 1},
-			{1, 0, 0, 2, 0, 0, 0, 2, 0, 2, 0, 2, 0, 2, 0, 0, 0, 2, 0, 0, 0, 1},
-			{1, 0, 0, 0, 2, 0, 0, 2, 0, 2, 0, 2, 0, 2, 0, 0, 2, 0, 0, 0, 0, 1},
-			{1, 0, 0, 2, 0, 0, 0, 2, 0, 2, 2, 2, 0, 2, 0, 0, 0, 2, 0, 0, 0, 1},
-			{1, 0, 0, 2, 2, 2, 2, 0, 0, 2, 0, 2, 0, 0, 2, 2, 2, 2, 0, 0, 0, 1},
-			{1, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 1},
+			{1, 0, 0, 5, 5, 5, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 1},
+			{1, 0, 0, 0, 0, 5, 0, 0, 0, 2, 0, 2, 2, 0, 0, 0, 0, 2, 0, 0, 0, 1},
+			{1, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 2, 0, 3, 3, 0, 2, 0, 0, 0, 1},
+			{1, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2, 0, 0, 0, 1},
+			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 1},
+			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+			{1, 0, 0, 0, 0, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+			{1, 0, 0, 0, 0, 4, 0, 4, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 1},
+			{1, 0, 0, 0, 4, 0, 0, 4, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 1},
+			{1, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 5, 5, 5, 5, 0, 0, 0, 0, 1},
+			{1, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 1},
+			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 1},
+			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 1},
+			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 5, 5, 0, 0, 1},
+			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+			{1, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 1},
 			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 			{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}},
 		colors: []color.Color{color.RGBA{255, 255, 255, 150},
 			color.RGBA{0, 255, 0, 150},
-			color.RGBA{255, 0, 0, 150}},
+			color.RGBA{255, 0, 0, 150},
+			color.RGBA{0, 66, 255, 255},
+			color.RGBA{255, 0, 132, 255}},
 	}
 }
 func (g *Game) Layout(outWidth, outHeight int) (int, int) {
