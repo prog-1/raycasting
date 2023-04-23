@@ -185,8 +185,8 @@ func (g *game) Draw(screen *ebiten.Image) {
 	drawLine(g.P.Pos, g.P.Pos.Add(g.P.Dir), color.White)
 
 	// Rays:
-	g.P.Pos = &vector2.Vector2{X: 3.5, Y: 3.5}
-	g.P.Dir = &vector2.Vector2{X: -0.6, Y: -0.8}
+	// g.P.Pos = &vector2.Vector2{X: 3.5, Y: 3.5}
+	// g.P.Dir = &vector2.Vector2{X: -0.6, Y: -0.8}
 	l := GetRayLengthToIntersection(*g.P.Pos, *g.P.Dir, *g.Maze)
 	// fmt.Println(l)
 	drawLine(g.P.Pos, g.P.Pos.Add(g.P.Dir.MulScalar(l)), color.RGBA{0, 0, 255, 255})
@@ -212,41 +212,30 @@ func (g *game) Draw(screen *ebiten.Image) {
 // Returns length of the ray casted from the point p in the direction of d to the wall in the map m
 func GetRayLengthToIntersection(p, d vector2.Vector2, m [cc][cc]int) float64 {
 	d = *d.Normalize()
-	mod := func(a float64) float64 {
-		if a > 0 {
-			return a
-		} else {
-			return -a
-		}
-	}
 	frac := func(a float64) float64 {
 		return a - float64(int(a))
 	}
 
-	var l vector2.Vector2     // Total line length from stepping to the neighbors along OX and OY
-	var k1 vector2.Vector2    // Distance to the nearest neighbor along OX and OY, which we can express using starting point coordinates(p.X and P.Y)
-	tg := mod(d.Y) / mod(d.X) // tangent of the angle between lx or ly and frac(k.X) or frac(k.Y)
-	var ms Pair[int, int]     // maze step(+1 or -1)
+	var l vector2.Vector2                                                                                 // Total line length from stepping to the neighbors along OX and OY
+	step := vector2.Vector2{X: math.Sqrt(1 + (d.Y/d.X)*(d.Y/d.X)), Y: math.Sqrt(1 + (d.X/d.Y)*(d.X/d.Y))} // Ray's length from the current intersection point to another along OX and OY
+	var ms Pair[int, int]                                                                                 // maze step(+1 or -1)
 	if d.X > 0 {
 		ms.X = 1
-		k1.X = 1 - frac(p.X)
+		l.X = (1 - frac(p.X)) * step.X
 	} else {
 		ms.X = -1
-		k1.X = frac(p.X)
+		l.X = frac(p.X) * step.X
 	}
 	if d.Y > 0 {
 		ms.Y = 1
-		k1.Y = 1 - frac(p.Y)
+		l.Y = (1 - frac(p.Y)) * step.Y
 	} else {
 		ms.Y = -1
-		k1.Y = frac(p.Y)
+		l.Y = frac(p.Y) * step.Y
 	}
-	k2 := vector2.Vector2{X: k1.X * tg, Y: k1.Y / tg}                                 // tg = y/x => y = xtg, x = y/tg
-	l.X, l.Y = math.Sqrt(k1.X*k1.X+k2.X*k2.X), math.Sqrt(k1.Y*k1.Y+k2.Y*k2.Y)         // Ray's length from p to intersection point with the nearest neighbor along OX and OY
-	step := vector2.Vector2{X: math.Sqrt(1 + k2.X*k2.X), Y: math.Sqrt(1 + k2.Y*k2.Y)} // Ray's length from the current intersection point to another along OX and OY
-	var len float64                                                                   // Ray's length to the intersection point with the wall
-	c := Pair[int, int]{int(p.X), int(p.Y)}                                           // current cell
-	for m[int(c.X)][int(c.Y)] == 0 /*empty*/ || m[int(c.X)][int(c.Y)] == 9 /*player spawning point*/ {
+	var len float64                         // Ray's length to the intersection point with the wall
+	c := Pair[int, int]{int(p.X), int(p.Y)} // current cell
+	for m[int(c.Y)][int(c.X)] == 0 /*empty*/ || m[int(c.Y)][int(c.X)] == 9 /*player's spawning point*/ {
 		if l.X < l.Y {
 			len = l.X
 			l.X += step.X
