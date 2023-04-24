@@ -54,24 +54,24 @@ func (g *Game) Update() error {
 	//Player WASD Movement
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
 		//collision handling
-		if nextPos := add(g.playerPos, multiply(g.viewDir, playerCol)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 { //if next position of the player is not the wall
+		if nextPos := add(g.playerPos, scale(g.viewDir, playerCol)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 { //if next position of the player is not the wall
 			//g.playerPos = add(g.playerPos, divide(g.viewDir, viewLen))
 			g.playerPos = add(g.playerPos, g.viewDir)
 			//adding viewDir to playerPos to move forward on 1 pixel
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		if nextPos := subtract(g.playerPos, multiply(g.viewDir, playerCol)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 {
+		if nextPos := subtract(g.playerPos, scale(g.viewDir, playerCol)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 {
 			g.playerPos = subtract(g.playerPos, g.viewDir) //same as W, but subtracting viewDir
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		if nextPos := add(g.playerPos, rotate(multiply(g.viewDir, playerCol), -math.Pi/2)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 {
+		if nextPos := add(g.playerPos, rotate(scale(g.viewDir, playerCol), -math.Pi/2)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 {
 			g.playerPos = add(g.playerPos, rotate(g.viewDir, -math.Pi/2)) //rotating on 90 before adding
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		if nextPos := add(g.playerPos, rotate(multiply(g.viewDir, playerCol), math.Pi/2)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 {
+		if nextPos := add(g.playerPos, rotate(scale(g.viewDir, playerCol), math.Pi/2)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 {
 			g.playerPos = add(g.playerPos, rotate(g.viewDir, math.Pi/2)) //rotating on -90 before adding
 		}
 	}
@@ -120,9 +120,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	//# FIELD OF VIEW #
 
-	camA := add(multiply(g.viewDir, viewLen), rotate(multiply(g.viewDir, viewLen), math.Pi/2))  //first camera point
-	camB := add(multiply(g.viewDir, viewLen), rotate(multiply(g.viewDir, viewLen), -math.Pi/2)) //last camera point
-	camPlane := line{camA, camB}                                                                //camera plane line
+	camA := add(scale(g.viewDir, viewLen), rotate(scale(g.viewDir, viewLen), math.Pi/2))  //first camera point
+	camB := add(scale(g.viewDir, viewLen), rotate(scale(g.viewDir, viewLen), -math.Pi/2)) //last camera point
+	camPlane := line{camA, camB}                                                          //camera plane line
 
 	//# Ray Drawing #
 	//segment length for each projection
@@ -136,7 +136,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		r.y = (camPlane.a.y + (segLenY * i))
 		r = norm(r) //ray unit vector
 
-		res := multiply(r, g.DDA(r))                                                                                                                          //calculate ray length
+		//pmp := divide(subtract(g.playerPos, g.mapPos), cellSize) //player map position
+		res := scale(r, g.DDA(r))                                                                                                                             //calculate ray length
 		ebitenutil.DrawLine(g.screenBuffer, g.playerPos.x, g.playerPos.y, g.playerPos.x+res.x, g.playerPos.y+res.y, color.RGBA{242, 207, 85, 200} /*Yellow*/) //draw ray
 	}
 
@@ -144,7 +145,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	//fmt.Println(divide(subtract(g.playerPos, g.mapPos), cellSize))
 
 	//player view line drawing
-	ebitenutil.DrawLine(g.screenBuffer, g.playerPos.x, g.playerPos.y, g.playerPos.x+multiply(g.viewDir, viewLen).x, g.playerPos.y+multiply(g.viewDir, viewLen).y, color.RGBA{255, 146, 28, 200} /*Orange*/)
+	ebitenutil.DrawLine(g.screenBuffer, g.playerPos.x, g.playerPos.y, g.playerPos.x+scale(g.viewDir, viewLen).x, g.playerPos.y+scale(g.viewDir, viewLen).y, color.RGBA{255, 146, 28, 200} /*Orange*/)
 
 	//camera plane line drawing
 	ebitenutil.DrawLine(g.screenBuffer, g.playerPos.x+camPlane.a.x, g.playerPos.y+camPlane.a.y, g.playerPos.x+camPlane.b.x, g.playerPos.y+camPlane.b.y, color.RGBA{132, 132, 255, 200} /*Blue*/)
@@ -184,45 +185,50 @@ func (g *Game) Draw(screen *ebiten.Image) {
 //DDA - calculates length of the ray
 //inputs unit (direction) vector.
 //outputs length of the ray
-func (g Game) DDA(v vector) (len float64) {
-	pmp := divide(subtract(g.playerPos, g.mapPos), cellSize) //player map position
-	var frac vector                                          //fraction from player's position in cell
-	frac.x = pmp.x - float64(int(pmp.x))
-	frac.y = pmp.y - float64(int(pmp.y))
-	var curCell vector //current cell (variable "map")
-	curCell.x = pmp.x - frac.x
-	curCell.y = pmp.y - frac.y
-	var mapd vector //step where to go on each direction
+func (g Game) DDA(v vector) (rayLen float64) {
+
+	pmp := scale(subtract(g.playerPos, g.mapPos), 1.0/cellSize) //player map position
+
+	var curCell vector            //current cell
+	curCell.x = math.Trunc(pmp.x) //pmp.x - frac.x
+	curCell.y = math.Trunc(pmp.y) //pmp.y - frac.y
+
+	var step vector            //distance to row and column of ray in cell (vRayUnitStepSize)
+	step.x = math.Abs(1 / v.x) // √ 1^2 + k^2
+	step.y = math.Abs(1 / v.y) // √ 1^2 + (1/k)^2
+
+	var dist vector //initial distance to first row and column (vRayLength1D)
+
+	var mapd vector //step where to go on each direction (vStep)
 	if v.x < 0 {
 		mapd.x = -1
+		dist.x = (pmp.x - curCell.x) * step.x
 	} else {
 		mapd.x = 1
+		dist.x = (curCell.x + 1 - pmp.x) * step.x //right neighbor cell - player x
 	}
 	if v.y < 0 {
 		mapd.y = -1
+		dist.y = (pmp.y - curCell.y) * step.y
 	} else {
-		curCell.y = 1
+		mapd.y = 1
+		dist.y = (curCell.y + 1 - pmp.y) * step.y //bottom neighbor cell - player y
 	}
-	var step vector                                                          //distance to row and column of ray in cell
-	step.x = cellSize * math.Sqrt(1+(v.y/v.x)*(v.y/v.x))                     // √ 1^2 + k^2
-	step.y = cellSize * math.Sqrt(1+(v.x/v.y)*(v.x/v.y))                     // √ 1^2 + (1/k)^2
-	var dist vector                                                          //initial distance to first row and column
-	dist.x = cellSize * math.Sqrt((1-frac.x)*(1-frac.x)+(v.y/v.x)*(v.y/v.x)) // √ (1-frac.x)^2 + k^2
-	dist.y = cellSize * math.Sqrt((1-frac.y)*(1-frac.y)+(v.x/v.y)*(v.x/v.y)) // √ (1-frac.y)^2 + (1/k)^2
 
-	for g.gameMap[int(curCell.x)][int(curCell.y)] == 0 {
+	for {
 		if dist.x < dist.y {
-			len = dist.x
+			rayLen = dist.x
 			dist.x += step.x
 			curCell.x += mapd.x
 		} else /* dist.x >= dist.y */ {
-			len = dist.y
+			rayLen = dist.y
 			dist.y += step.y
 			curCell.y += mapd.y
 		}
+		if g.gameMap[int(curCell.y)][int(curCell.x)] != 0 {
+			return rayLen * cellSize
+		}
 	}
-
-	return len
 }
 
 //normalize - converts vector to unit vector
@@ -240,17 +246,17 @@ func mod(v vector) float64 {
 
 func rotate(p vector, angle float64) (res vector) {
 
+	sin, cos := math.Sincos(angle)
+
 	//Rotation
-	res.x = p.x*math.Cos(angle) - p.y*math.Sin(angle)
-	res.y = p.x*math.Sin(angle) + p.y*math.Cos(angle)
+	res.x = p.x*cos - p.y*sin
+	res.y = p.x*sin + p.y*cos
 
 	return res
 }
 
 func subtract(a, b vector) (res vector) {
-	res.x = a.x - b.x
-	res.y = a.y - b.y
-	return res
+	return vector{a.x - b.x, a.y - b.y}
 }
 
 func add(a, b vector) (res vector) {
@@ -259,16 +265,8 @@ func add(a, b vector) (res vector) {
 	return res
 }
 
-func multiply(a vector, v float64) (res vector) { //v - value
-	res.x = a.x * v
-	res.y = a.y * v
-	return res
-}
-
-func divide(a vector, v float64) (res vector) { //v - value
-	res.x = a.x / v
-	res.y = a.y / v
-	return res
+func scale(a vector, v float64) (res vector) { //v - value
+	return vector{a.x * v, a.y * v}
 }
 
 // draw cell with proper color
@@ -287,7 +285,7 @@ func initGameMap() [][]int {
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 		{1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1},
-		{1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+		{1, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
@@ -296,10 +294,10 @@ func initGameMap() [][]int {
 		{1, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 1},
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-		{1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-		{1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1},
+		{1, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1, 1, 1, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+		{1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1},
+		{1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1},
+		{1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1},
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
