@@ -13,7 +13,7 @@ import (
 
 const (
 	sw, sh = 1920, 1080 // screen width and height(in pixels)
-	ms     = 500        // map width/height(width=height)(in pixels)
+	cs     = 50         // cell size - width/height(width=height)(in pixels)
 	cc     = 5          // cell count in row/column(row=column)
 )
 
@@ -86,7 +86,7 @@ func NewGame() *game {
 				break
 			}
 		}
-		if x == cc-1 && y == cc-1 { // Maze's bottom right cell(which has to be a wall) -> No 9 in maze
+		if x == cc && y == cc { // Maze's bottom right cell(which has to be a wall) -> No 9 in maze
 			panic("Maze must have player spawn(9)")
 		}
 		return Player{
@@ -154,7 +154,6 @@ func (g *game) Update() error {
 	return nil
 }
 func (g *game) Draw(screen *ebiten.Image) {
-	const cs = float64(ms) / cc // cell size(width/height(in pixels))
 
 	drawLine := func(a, b *vector2.Vector2, clr color.Color) {
 		u := a.MulScalar(cs)
