@@ -86,7 +86,7 @@ func NewGame() *game {
 				break
 			}
 		}
-		if x == cc && y == cc { // Maze's bottom right cell(which has to be a wall) -> No 9 in maze
+		if x == cc-1 && y == cc-1 { // Maze's bottom right cell(which has to be a wall) -> No 9 in maze
 			panic("Maze must have player spawn(9)")
 		}
 		return Player{
