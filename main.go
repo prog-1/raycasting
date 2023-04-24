@@ -32,7 +32,7 @@ type Player struct {
 	Pos    *vector2.Vector2
 	Dir    *vector2.Vector2
 	ms, rs float64 // Movement and Rotation speed
-	l, w   int     // base length and width of player's FOV sector
+	FOV    float64
 }
 
 type game struct {
@@ -93,7 +93,7 @@ func NewGame() *game {
 			Pos: &vector2.Vector2{X: float64(x) + 0.5, Y: float64(y) + 0.5},
 			Dir: &vector2.Vector2{X: 1, Y: 0},
 			ms:  0.2, rs: 0.00125,
-			l: 1, w: 1}
+			FOV: math.Pi / 3}
 	}
 	return &game{
 		Maze: maze,
@@ -182,36 +182,34 @@ func (g *game) Draw(screen *ebiten.Image) {
 
 	// Player:
 	ebitenutil.DrawCircle(g.sb, g.P.Pos.X*cs, g.P.Pos.Y*cs, 10, color.White)
-	drawLine(g.P.Pos, g.P.Pos.Add(g.P.Dir), color.White)
 
 	// Rays:
-	// g.P.Pos = &vector2.Vector2{X: 3.5, Y: 3.5}
-	// g.P.Dir = &vector2.Vector2{X: -0.6, Y: -0.8}
-	l := GetRayLengthToIntersection(*g.P.Pos, *g.P.Dir, *g.Maze)
-	// fmt.Println(l)
-	drawLine(g.P.Pos, g.P.Pos.Add(g.P.Dir.MulScalar(l)), color.RGBA{0, 0, 255, 255})
+	for rad := g.P.FOV / 2; rad > -g.P.FOV/2; rad -= g.P.FOV / float64(g.RC) {
+		d := RotateZ(g.P.Dir, rad)
+		l := GetRayLengthToIntersection(g.P.Pos, d, *g.Maze)
+		drawLine(g.P.Pos, g.P.Pos.Add(d.MulScalar(l)), color.RGBA{255, 255, 0, 255})
+	}
 
 	// Screen manipulations:
 	opts := ebiten.DrawImageOptions{}
-	//p := ebiten.GeoM{}
-	//opts.GeoM.Translate(-g.P.Pos.X*cs, -g.P.Pos.Y*cs) // Translation: World -> Player local
-	//// x, y rotated by 90 deg. = -y,x
-	//p.SetElement(0, 0, -g.P.Dir.Y) // p1.X
-	//p.SetElement(0, 1, g.P.Dir.X)  // p1.Y
-	//p.SetElement(1, 0, g.P.Dir.X)  // p2.X
-	//p.SetElement(1, 1, g.P.Dir.Y)  // p2.Y
-	//p.Invert()
-	//opts.GeoM.Concat(p)                                                                     // Multiplication
-	//opts.GeoM.Scale(-1, -1)                                                                 // Flipping
-	opts.GeoM.Scale(1, -1)
+	p := ebiten.GeoM{}
+	opts.GeoM.Translate(-g.P.Pos.X*cs, -g.P.Pos.Y*cs) // Translation: World -> Player local
+	// x, y rotated by 90 deg. = -y,x
+	p.SetElement(0, 0, -g.P.Dir.Y) // p1.X
+	p.SetElement(0, 1, g.P.Dir.X)  // p1.Y
+	p.SetElement(1, 0, g.P.Dir.X)  // p2.X
+	p.SetElement(1, 1, g.P.Dir.Y)  // p2.Y
+	p.Invert()
+	opts.GeoM.Concat(p)                                                                     // Multiplication
+	opts.GeoM.Scale(-1, -1)                                                                 // Flipping
 	opts.GeoM.Translate(float64(screen.Bounds().Max.X/2), float64(screen.Bounds().Max.Y/2)) // Moving coord. center to screen center
 	screen.DrawImage(g.sb, &opts)
 	g.sb.Clear()
 }
 
 // Returns length of the ray casted from the point p in the direction of d to the wall in the map m
-func GetRayLengthToIntersection(p, d vector2.Vector2, m [cc][cc]int) float64 {
-	d = *d.Normalize()
+func GetRayLengthToIntersection(p, d *vector2.Vector2, m [cc][cc]int) float64 {
+	d = d.Normalize()
 	frac := func(a float64) float64 {
 		return a - float64(int(a))
 	}
