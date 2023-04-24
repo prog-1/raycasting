@@ -13,7 +13,7 @@ import (
 
 const (
 	sw, sh = 1920, 1080 // screen width and height(in pixels)
-	cs     = 35         // cell size - width/height(width=height)(in pixels)
+	cs     = 10         // cell size - width/height(width=height)(in pixels)
 )
 
 func RotateZ(v *vector2.Vector2, rad float64) *vector2.Vector2 {
@@ -67,30 +67,20 @@ func NewGame() *game {
 	// NOTE: Maze must have player spawn walls along the perimeter
 	g := &game{
 		Maze: [][]int{
-			{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 1},
-			{1, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 1},
-			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+			{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+			{1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1},
+			{1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1},
+			{1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1},
+			{1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1},
+			{1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1},
+			{1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1},
+			{1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1},
+			{1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1},
+			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+			{1, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+			{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 		},
 		P: Player{
 			Dir: &vector2.Vector2{X: 0, Y: 1},
@@ -199,9 +189,6 @@ func (g *game) Draw(screen *ebiten.Image) {
 		}
 	}
 
-	// Player:
-	ebitenutil.DrawCircle(g.sb, g.P.Pos.X*cs, g.P.Pos.Y*cs, 10, color.White)
-
 	// Rays:
 	for rad := g.P.FOV / 2; rad > -g.P.FOV/2; rad -= g.P.FOV / float64(g.RC) {
 		d := RotateZ(g.P.Dir, rad)
@@ -213,15 +200,17 @@ func (g *game) Draw(screen *ebiten.Image) {
 	opts := ebiten.DrawImageOptions{}
 	p := ebiten.GeoM{}
 	opts.GeoM.Translate(-g.P.Pos.X*cs, -g.P.Pos.Y*cs) // Translation: World -> Player local
+	// Rotation: World -> Player local:
 	// x, y rotated by 90 deg. = -y,x
 	p.SetElement(0, 0, -g.P.Dir.Y) // p1.X
 	p.SetElement(0, 1, g.P.Dir.X)  // p1.Y
 	p.SetElement(1, 0, g.P.Dir.X)  // p2.X
 	p.SetElement(1, 1, g.P.Dir.Y)  // p2.Y
 	p.Invert()
-	opts.GeoM.Concat(p)                                                                     // Multiplication
-	opts.GeoM.Scale(-1, -1)                                                                 // Flipping
-	opts.GeoM.Translate(float64(screen.Bounds().Max.X/2), float64(screen.Bounds().Max.Y/2)) // Moving coord. center to screen center
+
+	opts.GeoM.Concat(p)                                                      // Multiplication
+	opts.GeoM.Scale(-1, -1)                                                  // Flipping
+	opts.GeoM.Translate(float64(len(g.Maze[0]))*cs, float64(len(g.Maze))*cs) // Moving coord. center to screen center
 	screen.DrawImage(g.sb, &opts)
 	g.sb.Clear()
 }
