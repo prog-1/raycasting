@@ -7,6 +7,7 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
 const (
@@ -40,6 +41,7 @@ var (
 	}
 	oneBlockWidthLength  = width / len(maze[0])
 	oneBlockHeightLength = height / len(maze)
+	FOV                  = 30.0
 )
 
 type Point struct {
@@ -47,11 +49,15 @@ type Point struct {
 }
 
 type Game struct {
-	pos Point
-	dir Point
+	pos     Point
+	dir     Point
+	showMap bool
 }
 
 func (g *Game) Update() error {
+	if inpututil.IsKeyJustPressed(ebiten.KeyN) {
+		g.showMap = !g.showMap
+	}
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
 		a := int(g.pos.x+g.dir.x) / int(oneBlockWidthLength)
 		b := int(g.pos.y+g.dir.y) / int(oneBlockHeightLength)
@@ -87,10 +93,10 @@ func (g *Game) Update() error {
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) {
-		g.dir = Rotate(g.dir, -math.Pi/180)
+		g.dir = Rotate(g.dir, -math.Pi/140)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyArrowRight) {
-		g.dir = Rotate(g.dir, math.Pi/180)
+		g.dir = Rotate(g.dir, math.Pi/140)
 	}
 
 	return nil
@@ -117,7 +123,7 @@ func abs(a float64) float64 {
 	return a
 }
 
-func raycast(screen *ebiten.Image, pos Point, dirx, diry float64) (int, float64) {
+func raycast(screen *ebiten.Image, pos Point, dirx, diry float64, draw bool) (int, float64) {
 	mapX, mapY := int(pos.x), int(pos.y)
 
 	deltaDistX := abs(1 / dirx)
@@ -153,8 +159,9 @@ func raycast(screen *ebiten.Image, pos Point, dirx, diry float64) (int, float64)
 		//Check if ray has hit a wall
 		// fmt.Println(mapX, mapY)
 		if maze[mapY/int(oneBlockHeightLength)][mapX/int(oneBlockWidthLength)] > 0 {
-			ebitenutil.DrawLine(screen, pos.x, pos.y, float64(mapX), float64(mapY), color.RGBA{255, 255, 0, 255})
-
+			if draw {
+				ebitenutil.DrawLine(screen, pos.x, pos.y, float64(mapX), float64(mapY), color.RGBA{255, 255, 0, 255})
+			}
 			return side, math.Sqrt(math.Pow(float64(mapX)-pos.x, 2) + math.Pow(float64(mapY)-pos.y, 2))
 		}
 	}
@@ -162,20 +169,22 @@ func raycast(screen *ebiten.Image, pos Point, dirx, diry float64) (int, float64)
 
 func (g *Game) Draw(screen *ebiten.Image) {
 	// ebitenutil.DebugPrint(screen, "Hello, World!")
-	DrawMap(screen)
-
-	ebitenutil.DrawCircle(screen, g.pos.x, g.pos.y, 3, color.RGBA{255, 255, 0, 255})
-	m := float64(width) / 6100.0
-	var line float64
-	for i := -30.0; i < 31; i += 0.01 {
-
-		tmp := Rotate(g.dir, i*math.Pi/180)
+	if g.showMap {
+		DrawMap(screen)
+		ebitenutil.DrawCircle(screen, g.pos.x, g.pos.y, 3, color.RGBA{255, 255, 0, 255})
+	}
+	// fmt.Println(screen.Size())
+	for i, line := -FOV, 0.0; i <= FOV; i, line = i+2*FOV/(width-1), line+1 {
+		c := color.RGBA{91, 97, 89, 250}
+		tmp := Rotate(g.dir, i*math.Pi/180.0)
 		// ebitenutil.DrawLine(screen, g.pos.x, g.pos.y, g.pos.x+tmp.x*1000, g.pos.y+tmp.y*1000, color.RGBA{255, 255, 0, 255})
-		_, distance := raycast(screen, g.pos, tmp.x, tmp.y)
-		ebitenutil.DrawLine(screen, line, width/2, line, (width/2)+(width/2)/distance, color.RGBA{0, 255, 0, 255})
-		ebitenutil.DrawLine(screen, line, width/2, line, (width/2)-(width/2)/distance, color.RGBA{0, 255, 0, 255})
+		side, distance := raycast(screen, g.pos, tmp.x, tmp.y, g.showMap)
+		if side == 1 {
+			c = color.RGBA{155, 161, 153, 255}
+		}
+		ebitenutil.DrawLine(screen, line, height/2, line, (height/2)+(height/2)/distance, c)
+		ebitenutil.DrawLine(screen, line, height/2, line, (height/2)-(height/2)/distance, c)
 
-		line += m
 	}
 	// ebitenutil.DrawRect(screen, float64(a*oneBlockWidthLength), float64(b*oneBlockHeightLength), float64(oneBlockWidthLength), float64(oneBlockHeightLength), color.RGBA{0, 0, 255, 255})
 }
@@ -187,7 +196,7 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeigh
 func main() {
 	ebiten.SetWindowSize(width, height)
 	ebiten.SetWindowTitle("Hello, World!")
-	if err := ebiten.RunGame(&Game{Point{320, 350}, Point{0, -1}}); err != nil {
+	if err := ebiten.RunGame(&Game{Point{320, 350}, Point{0, -1}, false}); err != nil {
 		log.Fatal(err)
 	}
 }
