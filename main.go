@@ -23,19 +23,10 @@ type Point struct {
 type Game struct {
 	width, height int
 	maze          [][]int
-	wallColors    map[int]color.RGBA
 	mazeScale     int
 	player        Point
 	playerEyesDir Point
 	fov           Point
-}
-
-func sum(a, b Point) Point {
-	return Point{a.x + b.x, a.y + b.y}
-}
-
-func sub(a, b Point) Point {
-	return Point{a.x - b.x, a.y - b.y}
 }
 
 func rotate(p Point, angle float64) Point {
@@ -94,6 +85,7 @@ func (g *Game) Update() error {
 
 func (g *Game) Draw(screen *ebiten.Image) {
 	// if ebiten.IsKeyPressed(ebiten.KeyM) {
+	g.DrawWalls(screen)
 	g.DrawMinimap(screen)
 	g.DrawPlayer(screen)
 	g.DrawFov(screen)
@@ -105,7 +97,7 @@ func (g *Game) DrawMinimap(screen *ebiten.Image) {
 	for i := range g.maze {
 		for _, j := range g.maze[i] {
 			if j > 0 {
-				vector.DrawFilledRect(screen, float32(x), float32(y), float32(g.mazeScale), float32(g.mazeScale), g.wallColors[j], false)
+				vector.DrawFilledRect(screen, float32(x), float32(y), float32(g.mazeScale), float32(g.mazeScale), color.White, false)
 			}
 			x += g.mazeScale
 		}
@@ -139,10 +131,63 @@ func (g *Game) DrawFov(screen *ebiten.Image) {
 			}
 		}
 		vector.StrokeLine(screen, float32(g.player.x), float32(g.player.y), float32(dot.x), float32(dot.y), 1, color.RGBA{255, 255, 0, 255}, false)
-		wh := screenHeight / dist
-		vector.StrokeLine(screen, float32(i), float32(screenHeight/2), float32(i), float32(screenHeight/2+wh/2), 1, color.RGBA{255, 255, 0, 200}, false)
-		vector.StrokeLine(screen, float32(i), float32(screenHeight/2), float32(i), float32(screenHeight/2-wh/2), 1, color.RGBA{255, 255, 0, 200}, false)
 	}
+}
+
+func (g *Game) DrawWalls(screen *ebiten.Image) {
+	perpenDist := g.perpendicul()
+	for i := 0.0; i < screenWidth; i++ {
+		cameraX := 2*i/float64(screenWidth) - 1
+		ray := Point{g.playerEyesDir.x + g.fov.x*cameraX, g.playerEyesDir.y + g.fov.y*cameraX}
+		dot := Point{math.Floor(g.player.x), math.Floor(g.player.y)}
+		deltaDistX, deltaDistY := float64(math.Abs(1/ray.x)), float64(math.Abs(1/ray.y))
+		stepX, stepY, sideDistX, sideDistY := g.startDists(ray, dot, deltaDistX, deltaDistY)
+		var wallVert bool
+		var wallHigh float64
+		for g.maze[int(dot.y)/g.mazeScale][int(dot.x)/g.mazeScale] == 0 {
+			if sideDistX < sideDistY {
+				sideDistX += deltaDistX
+				dot.x += float64(stepX)
+				wallVert = false
+			} else {
+				sideDistY += deltaDistY
+				dot.y += float64(stepY)
+				wallVert = true
+			}
+		}
+		if wallVert {
+			x := math.Abs(screenWidth/2 - i)
+			wallHigh = screenHeight / ((perpenDist * math.Sqrt(float64(1+x*x))) / x)
+			vector.StrokeLine(screen, float32(i), float32(screenHeight/2), float32(i), float32(screenHeight/2+wallHigh/2), 1, color.RGBA{10, 200, 10, 200}, false)
+			vector.StrokeLine(screen, float32(i), float32(screenHeight/2), float32(i), float32(screenHeight/2-wallHigh/2), 1, color.RGBA{10, 200, 10, 200}, false)
+		} else {
+			x := math.Abs(screenWidth/2 - i)
+			wallHigh = screenHeight / (perpenDist * math.Sqrt(float64(1+x*x)))
+			vector.StrokeLine(screen, float32(i), float32(screenHeight/2), float32(i), float32(screenHeight/2+wallHigh/2), 1, color.RGBA{10, 200, 10, 200}, false)
+			vector.StrokeLine(screen, float32(i), float32(screenHeight/2), float32(i), float32(screenHeight/2-wallHigh/2), 1, color.RGBA{10, 200, 10, 200}, false)
+		}
+	}
+}
+
+func (g *Game) perpendicul() float64 {
+	cameraX := 2*(screenWidth/2)/float64(screenWidth) - 1
+	ray := Point{g.playerEyesDir.x + g.fov.x*cameraX, g.playerEyesDir.y + g.fov.y*cameraX}
+	dot := Point{math.Floor(g.player.x), math.Floor(g.player.y)}
+	deltaDistX, deltaDistY := float64(math.Abs(1/ray.x)), float64(math.Abs(1/ray.y))
+	stepX, stepY, sideDistX, sideDistY := g.startDists(ray, dot, deltaDistX, deltaDistY)
+	dist := sideDistX + sideDistY
+	for g.maze[int(dot.y)/g.mazeScale][int(dot.x)/g.mazeScale] == 0 {
+		if sideDistX < sideDistY {
+			sideDistX += deltaDistX
+			dot.x += float64(stepX)
+			dist += deltaDistX
+		} else {
+			sideDistY += deltaDistY
+			dot.y += float64(stepY)
+			dist += deltaDistY
+		}
+	}
+	return dist
 }
 
 func NewGame(width, height int) *Game {
@@ -170,12 +215,6 @@ func NewGame(width, height int) *Game {
 			{1, 0, 3, 0, 3, 0, 3, 0, 0, 0, 0, 0, 0, 0, 4, 4, 4, 4, 4, 1},
 			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 			{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-		},
-		wallColors: map[int]color.RGBA{
-			1: color.RGBA{255, 255, 255, 255},
-			2: color.RGBA{200, 10, 10, 255},
-			3: color.RGBA{10, 200, 10, 255},
-			4: color.RGBA{10, 10, 200, 255},
 		},
 		mazeScale:     15,
 		player:        Point{20, 20},
