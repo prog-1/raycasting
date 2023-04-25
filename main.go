@@ -37,9 +37,8 @@ type Player struct {
 type game struct {
 	Maze [][]int
 	P    Player
-	RC   int           //Ray Count
-	pft  int64         // Previous frame time
-	sb   *ebiten.Image // Screen buffer
+	RC   int   //Ray Count
+	pft  int64 // Previous frame time
 }
 
 func FlipVertically(out *[][]int) {
@@ -87,9 +86,8 @@ func NewGame() *game {
 			ms:  0.2, rs: 0.00125,
 			FOV: math.Pi / 3,
 		},
-		RC:  101,
+		RC:  201,
 		pft: 0,
-		sb:  ebiten.NewImage(sw, sh),
 	}
 
 	FlipVertically(&g.Maze)
@@ -163,14 +161,22 @@ func (g *game) Update() error {
 	}
 	return nil
 }
+
+var mb, wb = ebiten.NewImage(sw, sh), ebiten.NewImage(sw, sh) // Minimap and world buffers
 func (g *game) Draw(screen *ebiten.Image) {
+	screen.Clear()
+	mb.Clear()
+	wb.Clear()
 
-	drawLine := func(a, b *vector2.Vector2, clr color.Color) {
-		u := a.MulScalar(cs)
-		v := b.MulScalar(cs)
-		ebitenutil.DrawLine(g.sb, u.X, u.Y, v.X, v.Y, clr)
+	drawLine := func(s *ebiten.Image, a, b *vector2.Vector2, clr color.Color) {
+		u, v := a.MulScalar(cs), b.MulScalar(cs)
+		ebitenutil.DrawLine(s, u.X, u.Y, v.X, v.Y, clr)
 	}
-
+	// a - lower left point, b - width and height
+	drawRect := func(s *ebiten.Image, a, b *vector2.Vector2, clr color.Color) {
+		u, v := a.MulScalar(cs), b.MulScalar(cs)
+		ebitenutil.DrawRect(s, u.X, u.Y, v.X, v.Y, clr)
+	}
 	// Maze:
 	for y := range g.Maze {
 		for x := range g.Maze[y] {
@@ -184,19 +190,35 @@ func (g *game) Draw(screen *ebiten.Image) {
 					clr = color.White
 				}
 
-				ebitenutil.DrawRect(g.sb, cp.X, cp.Y, cs, cs, clr)
+				ebitenutil.DrawRect(mb, cp.X, cp.Y, cs, cs, clr)
 			}
 		}
 	}
 
 	// Rays:
+	lw := (float64(screen.Bounds().Max.X) / cs) / float64(g.RC-1) // Wall line width(in cells)
+	i := 0.0
 	for rad := g.P.FOV / 2; rad > -g.P.FOV/2; rad -= g.P.FOV / float64(g.RC) {
 		d := RotateZ(g.P.Dir, rad)
 		l := GetRayLengthToIntersection(g.P.Pos, d, &g.Maze)
-		drawLine(g.P.Pos, g.P.Pos.Add(d.MulScalar(l)), color.RGBA{255, 255, 0, 255})
+		// Line on minimap:
+		drawLine(mb, g.P.Pos, g.P.Pos.Add(d.MulScalar(l)), color.RGBA{255, 255, 0, 255})
+		// Pseudo 3D:
+		const sch = float64(sh) / cs // Screen cell height(in cells)
+		lh := sch / l                // Wall line height(in cells)
+		if lh > sch {
+			lh = sch
+		}
+		// drawLine(screen, &vector2.Vector2{X: float64(lw) * i, Y: float64(screen.Bounds().Max.Y/2) - lh/2}, &vector2.Vector2{X: float64(lw) * i, Y: float64(screen.Bounds().Max.Y/2) + lh/2}, color.White)
+		drawRect(wb, &vector2.Vector2{X: lw * i, Y: sch/2 - lh/2}, &vector2.Vector2{X: lw*i + 1, Y: lh}, color.White)
+		i++
 	}
 
-	// Screen manipulations:
+	// Drawing buffers:
+	// World:
+	screen.DrawImage(wb, &ebiten.DrawImageOptions{})
+	// Minimap:
+	// Screen transformation:
 	opts := ebiten.DrawImageOptions{}
 	p := ebiten.GeoM{}
 	opts.GeoM.Translate(-g.P.Pos.X*cs, -g.P.Pos.Y*cs) // Translation: World -> Player local
@@ -207,12 +229,11 @@ func (g *game) Draw(screen *ebiten.Image) {
 	p.SetElement(1, 0, g.P.Dir.X)  // p2.X
 	p.SetElement(1, 1, g.P.Dir.Y)  // p2.Y
 	p.Invert()
-
+	//
 	opts.GeoM.Concat(p)                                                      // Multiplication
 	opts.GeoM.Scale(-1, -1)                                                  // Flipping
 	opts.GeoM.Translate(float64(len(g.Maze[0]))*cs, float64(len(g.Maze))*cs) // Moving coord. center to screen center
-	screen.DrawImage(g.sb, &opts)
-	g.sb.Clear()
+	screen.DrawImage(mb, &opts)
 }
 
 // Returns length of the ray casted from the point p in the direction of d to the wall in the map m
