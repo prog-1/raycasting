@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"image/color"
 	"log"
 	"math"
@@ -162,6 +163,20 @@ func (g *game) Update() error {
 	return nil
 }
 
+// l - ray's length to intersection
+func getPerPendicularToCameraPlane(l float64, p *Player) float64 {
+	// How to get rid of the fisheye effect?
+	// When calculating wall's heigth instead of distance from the player to the wall use distance(perpendicular) to the camera plane
+	// How to find perpendicular(p)?
+	// p = l/d, where l - length of the ray and d - side of the player's view sector(triangle) with height adjacent to base = 1
+	// https://prnt.sc/EpuLZAFM4pKU
+	// How to calculate d?
+	// d = 1/cos(FOV/2)
+	// https://prnt.sc/d2ipuW31vFTt
+	r := l / (1 / math.Cos(p.FOV/2))
+	return r
+}
+
 var mb, wb = ebiten.NewImage(sw, sh), ebiten.NewImage(sw, sh) // Minimap and world buffers
 func (g *game) Draw(screen *ebiten.Image) {
 	screen.Clear()
@@ -197,7 +212,7 @@ func (g *game) Draw(screen *ebiten.Image) {
 
 	// Rays:
 	lw := (float64(screen.Bounds().Max.X) / cs) / float64(g.RC-1) // Wall line width(in cells)
-	i := 0.0
+	i := 0.0                                                      // iterator for rays
 	for rad := g.P.FOV / 2; rad > -g.P.FOV/2; rad -= g.P.FOV / float64(g.RC) {
 		d := RotateZ(g.P.Dir, rad)
 		l := GetRayLengthToIntersection(g.P.Pos, d, &g.Maze)
@@ -205,11 +220,12 @@ func (g *game) Draw(screen *ebiten.Image) {
 		drawLine(mb, g.P.Pos, g.P.Pos.Add(d.MulScalar(l)), color.RGBA{255, 255, 0, 255})
 		// Pseudo 3D:
 		const sch = float64(sh) / cs // Screen cell height(in cells)
-		lh := sch / l                // Wall line height(in cells)
+		lh1 := sch / l
+		fmt.Println(lh1)
+		lh := sch / getPerPendicularToCameraPlane(l, &g.P) // Wall line height(in cells)
 		if lh > sch {
 			lh = sch
 		}
-		// drawLine(screen, &vector2.Vector2{X: float64(lw) * i, Y: float64(screen.Bounds().Max.Y/2) - lh/2}, &vector2.Vector2{X: float64(lw) * i, Y: float64(screen.Bounds().Max.Y/2) + lh/2}, color.White)
 		drawRect(wb, &vector2.Vector2{X: lw * i, Y: sch/2 - lh/2}, &vector2.Vector2{X: lw*i + 1, Y: lh}, color.White)
 		i++
 	}
