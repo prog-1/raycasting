@@ -24,8 +24,9 @@ const (
 )
 
 type Game struct {
-	mapScreenBuffer *ebiten.Image
-	width, height   int //screen width and height [in pixels]
+	worldScreenBuffer *ebiten.Image
+	mapScreenBuffer   *ebiten.Image
+	width, height     int //screen width and height [in pixels]
 	//variables
 	gameMap   [][]int   //game map 2d matrix
 	playerPos vector    //player position [in cells]
@@ -55,8 +56,8 @@ func (g *Game) Update() error {
 	//Time
 	ft := time.Now().Sub(g.pt).Seconds() //difference from cur frame and last saved
 	g.pt = time.Now()                    //updating previous frame time
-	mspd := ft * 80                      //movement speed
-	rspd := ft * 100                     //rotation speed
+	mspeed := ft * 80                    //movement speed
+	rspeed := ft * 100                   //rotation speed
 
 	move := func(nextPos vector) {
 		//collision handling
@@ -70,29 +71,29 @@ func (g *Game) Update() error {
 
 	//Player WASD Movement
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
-		nextPos := add(g.playerPos, scale(scale(g.viewDir, 1/g.cellSize), mspd)) // nextPos = playerPos + viewdir*(1/25)
+		nextPos := add(g.playerPos, scale(scale(g.viewDir, 1/g.cellSize), mspeed)) // nextPos = playerPos + viewdir*(1/25)
 		move(nextPos)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
 		//same as W, bust substracting viewdir from player pos
-		nextPos := subtract(g.playerPos, scale(scale(g.viewDir, 1/g.cellSize), mspd)) // nextPos = playerPos - viewdir*(1/25)
+		nextPos := subtract(g.playerPos, scale(scale(g.viewDir, 1/g.cellSize), mspeed)) // nextPos = playerPos - viewdir*(1/25)
 		move(nextPos)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
 		//rotating on 90 before adding
-		nextPos := add(g.playerPos, rotate(scale(scale(g.viewDir, 1/g.cellSize), mspd), -math.Pi/2)) // nextPos = playerPos + viewdir*(1/25) on +90°
+		nextPos := add(g.playerPos, rotate(scale(scale(g.viewDir, 1/g.cellSize), mspeed), -math.Pi/2)) // nextPos = playerPos + viewdir*(1/25) on +90°
 		move(nextPos)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
 		//rotating on -90 before adding
-		nextPos := add(g.playerPos, rotate(scale(scale(g.viewDir, 1/g.cellSize), mspd), math.Pi/2)) // nextPos = playerPos + viewdir*(1/25) on -90°
+		nextPos := add(g.playerPos, rotate(scale(scale(g.viewDir, 1/g.cellSize), mspeed), math.Pi/2)) // nextPos = playerPos + viewdir*(1/25) on -90°
 		move(nextPos)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) {
-		g.viewDir = rotate(g.viewDir, -math.Pi/200*rspd)
+		g.viewDir = rotate(g.viewDir, -math.Pi/200*rspeed)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyArrowRight) {
-		g.viewDir = rotate(g.viewDir, math.Pi/200*rspd)
+		g.viewDir = rotate(g.viewDir, math.Pi/200*rspeed)
 	}
 	return nil
 }
@@ -111,18 +112,25 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	viewLen := 150.0 //lenght of player view and camera plane lines [in pixels]
 	//if len of viewDir = len of camPlane, then FoV = 90 degrees
 	mapPos := vector{(sW / 2) - (mW / 2), (sH / 2) - (mH / 2)} // map position on the screen (top left corner) [world coordinates]
-	segNumber := 100.0                                         // number of segments of camera plane line for rays
+	rayAmount := float64(g.width)                              // amount of rays
 
 	playerPixelPos := vector{(g.playerPos.x * g.cellSize) + mapPos.x, (g.playerPos.y * g.cellSize) + mapPos.y} // player position [in pixels]
 
 	//---------------------
-	//----Screen-Buffer----
+	//----Screen-Buffers----
 	//---------------------
 
+	//mapScreenBuffer
 	if g.mapScreenBuffer == nil {
 		g.mapScreenBuffer = ebiten.NewImage(g.width, g.height) // creating buffer if we don't have one
 	}
-	g.mapScreenBuffer.Clear() //clearing previous screen to draw everything one more time
+	g.mapScreenBuffer.Clear() //clear to not affect empty space
+
+	//worldScreenBuffer
+	if g.worldScreenBuffer == nil {
+		g.worldScreenBuffer = ebiten.NewImage(g.width, g.height)
+	}
+	g.worldScreenBuffer.Clear()
 
 	//---------------------
 	//-----Map-Drawing-----
@@ -167,10 +175,10 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	//---------------------
 
 	//segment length for each projection
-	segLenX := (camPlane.b.x - camPlane.a.x) / segNumber
-	segLenY := (camPlane.b.y - camPlane.a.y) / segNumber
+	segLenX := (camPlane.b.x - camPlane.a.x) / (rayAmount - 1)
+	segLenY := (camPlane.b.y - camPlane.a.y) / (rayAmount - 1)
 
-	for i := 0.0; i <= segNumber; i++ { //for each segment
+	for i := 0.0; i <= rayAmount; i++ { //for each segment
 
 		var r vector //ray point on camPlane
 		r.x = (camPlane.a.x + (segLenX * i))
@@ -195,6 +203,10 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	//Draw player
 	ebitenutil.DrawCircle(g.mapScreenBuffer, playerPixelPos.x, playerPixelPos.y, 10, color.RGBA{100, 180, 255, 255} /*Light blue*/)
+
+	//---------------------
+	//--------World--------
+	//---------------------
 
 	//---------------------
 	//----Screen-Drawing---
@@ -226,6 +238,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	opts.GeoM.Scale(scale, scale)
 	opts.GeoM.Translate((float64(screen.Bounds().Max.Y)*scale)/2, (float64(screen.Bounds().Max.Y)*scale)/2) //placing map screen in top left corner
 
+	// opts.GeoM.Translate(float64(screen.Bounds().Max.X)/2, float64(screen.Bounds().Max.Y)/2) //centering the screen
 	if g.drawMap {
 		screen.DrawImage(g.mapScreenBuffer, &opts) //drawing map screen buffer
 	}
