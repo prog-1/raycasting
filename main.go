@@ -139,7 +139,7 @@ func (g *Game) DrawWalls(screen *ebiten.Image) {
 			perpWallDist = sideDistY - deltaDistY
 		}
 		if g.fisheye {
-			perpWallDist = math.Sqrt(1 + math.Pow(math.Sqrt(math.Pow(rayDirX, 2)+math.Pow(rayDirY, 2)), 2))
+			perpWallDist *= math.Sqrt(1 + math.Pow(math.Sqrt(math.Pow(rayDirX, 2)+math.Pow(rayDirY, 2)), 2))
 		}
 		lineHeight := int(float64(screenHeight) / perpWallDist)
 		drawStart := -lineHeight/2 + screenHeight/2
@@ -179,7 +179,7 @@ func NewGame(width, height int) *Game {
 		cellSize:  15,
 		playerPos: Point{2, 2},
 		dir:       Point{1, 0},
-		fov:       Point{0.3, 0.3},
+		fov:       Point{0.5, 0.5},
 		gameMap: [][]int{
 			{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
