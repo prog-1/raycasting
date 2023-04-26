@@ -14,6 +14,7 @@ import (
 const (
 	screenWidth  = 960
 	screenHeight = 640
+	mazeScale =     15
 )
 
 type Point struct {
@@ -23,7 +24,6 @@ type Point struct {
 type Game struct {
 	width, height int
 	maze          [][]int
-	mazeScale     int
 	player        Point
 	playerEyesDir Point
 	fov           Point
@@ -56,21 +56,21 @@ func (g *Game) startDists(ray, dot Point, deltaX, deltaY float64) (stepX int, st
 }
 
 func (g *Game) Update() error {
-	if ebiten.IsKeyPressed(ebiten.KeyW) && g.maze[int(g.player.y+g.playerEyesDir.y)/g.mazeScale][int(g.player.x+g.playerEyesDir.x)/g.mazeScale] == 0 {
-		g.player.x = g.player.x + g.playerEyesDir.x
-		g.player.y = g.player.y + g.playerEyesDir.y
+	if ebiten.IsKeyPressed(ebiten.KeyW) && g.maze[int(g.player.y+g.playerEyesDir.y/mazeScale)][int(g.player.x+g.playerEyesDir.x/mazeScale)] == 0 {
+		g.player.x = g.player.x + g.playerEyesDir.x/mazeScale
+		g.player.y = g.player.y + g.playerEyesDir.y/mazeScale
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyA) && g.maze[int(g.player.y-g.playerEyesDir.y)/g.mazeScale][int(g.player.x+g.playerEyesDir.x)/g.mazeScale] == 0 {
-		g.player.x = g.player.x + g.playerEyesDir.x
-		g.player.y = g.player.y - g.playerEyesDir.y
+	if ebiten.IsKeyPressed(ebiten.KeyA) && g.maze[int(g.player.y-g.playerEyesDir.y/mazeScale)][int(g.player.x+g.playerEyesDir.x/mazeScale)] == 0 {
+		g.player.x = g.player.x + g.playerEyesDir.x/mazeScale
+		g.player.y = g.player.y - g.playerEyesDir.y/mazeScale
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyS) && g.maze[int(g.player.y-g.playerEyesDir.y)/g.mazeScale][int(g.player.x-g.playerEyesDir.x)/g.mazeScale] == 0 {
-		g.player.x = g.player.x - g.playerEyesDir.x
-		g.player.y = g.player.y - g.playerEyesDir.y
+	if ebiten.IsKeyPressed(ebiten.KeyS) && g.maze[int(g.player.y-g.playerEyesDir.y/mazeScale)][int(g.player.x-g.playerEyesDir.x/mazeScale)] == 0 {
+		g.player.x = g.player.x - g.playerEyesDir.x/mazeScale
+		g.player.y = g.player.y - g.playerEyesDir.y/mazeScale
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyD) && g.maze[int(g.player.y+g.playerEyesDir.y)/g.mazeScale][int(g.player.x-g.playerEyesDir.x)/g.mazeScale] == 0 {
-		g.player.x = g.player.x - g.playerEyesDir.x
-		g.player.y = g.player.y + g.playerEyesDir.y
+	if ebiten.IsKeyPressed(ebiten.KeyD) && g.maze[int(g.player.y+g.playerEyesDir.y/mazeScale)][int(g.player.x-g.playerEyesDir.x/mazeScale)] == 0 {
+		g.player.x = g.player.x - g.playerEyesDir.x/mazeScale
+		g.player.y = g.player.y + g.playerEyesDir.y/mazeScale
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyQ) {
 		g.playerEyesDir = rotate(g.playerEyesDir, math.Pi/60)
@@ -97,17 +97,17 @@ func (g *Game) DrawMinimap(screen *ebiten.Image) {
 	for i := range g.maze {
 		for _, j := range g.maze[i] {
 			if j > 0 {
-				vector.DrawFilledRect(screen, float32(x), float32(y), float32(g.mazeScale), float32(g.mazeScale), color.White, false)
+				vector.DrawFilledRect(screen, float32(x), float32(y), float32(mazeScale), float32(mazeScale), color.White, false)
 			}
-			x += g.mazeScale
+			x += mazeScale
 		}
 		x = 0
-		y += g.mazeScale
+		y += mazeScale
 	}
 }
 
 func (g *Game) DrawPlayer(screen *ebiten.Image) {
-	screen.Set(int(g.player.x), int(g.player.y), color.RGBA{255, 0, 0, 255})
+	screen.Set(int(g.player.x)*mazeScale, int(g.player.y)*mazeScale, color.RGBA{255, 0, 0, 255})
 }
 
 func (g *Game) DrawFov(screen *ebiten.Image) {
@@ -115,11 +115,11 @@ func (g *Game) DrawFov(screen *ebiten.Image) {
 		var dist float64
 		cameraX := 2*i/float64(screenWidth) - 1
 		ray := Point{g.playerEyesDir.x + g.fov.x*cameraX, g.playerEyesDir.y + g.fov.y*cameraX}
-		dot := Point{math.Floor(g.player.x), math.Floor(g.player.y)}
+		dot := Point{math.Floor(g.player.x*mazeScale), math.Floor(g.player.y*mazeScale)}
 		deltaDistX, deltaDistY := float64(math.Abs(1/ray.x)), float64(math.Abs(1/ray.y))
-		stepX, stepY, sideDistX, sideDistY := g.startDists(ray, dot, deltaDistX, deltaDistY)
+		stepX, stepY, sideDistX, sideDistY := g.startDists(ray, Point{dot.x/mazeScale,dot.y/mazeScale}, deltaDistX, deltaDistY)
 
-		for g.maze[int(dot.y)/g.mazeScale][int(dot.x)/g.mazeScale] == 0 {
+		for g.maze[int(dot.y)/mazeScale][int(dot.x)/mazeScale] == 0 {
 			if sideDistX < sideDistY {
 				sideDistX += deltaDistX
 				dot.x += float64(stepX)
@@ -130,12 +130,12 @@ func (g *Game) DrawFov(screen *ebiten.Image) {
 				dist += deltaDistY
 			}
 		}
-		vector.StrokeLine(screen, float32(g.player.x), float32(g.player.y), float32(dot.x), float32(dot.y), 1, color.RGBA{255, 255, 0, 255}, false)
+		vector.StrokeLine(screen, float32(g.player.x*float64(mazeScale)), float32(g.player.y*float64(mazeScale)), float32(dot.x), float32(dot.y), 1, color.RGBA{255, 255, 0, 255}, false)
 	}
 }
 
 func (g *Game) DrawWalls(screen *ebiten.Image) {
-	perpenDist := g.perpendicul()
+	perpWallDist := g.perpendicul()
 	for i := 0.0; i < screenWidth; i++ {
 		cameraX := 2*i/float64(screenWidth) - 1
 		ray := Point{g.playerEyesDir.x + g.fov.x*cameraX, g.playerEyesDir.y + g.fov.y*cameraX}
@@ -143,8 +143,9 @@ func (g *Game) DrawWalls(screen *ebiten.Image) {
 		deltaDistX, deltaDistY := float64(math.Abs(1/ray.x)), float64(math.Abs(1/ray.y))
 		stepX, stepY, sideDistX, sideDistY := g.startDists(ray, dot, deltaDistX, deltaDistY)
 		var wallVert bool
-		var wallHigh float64
-		for g.maze[int(dot.y)/g.mazeScale][int(dot.x)/g.mazeScale] == 0 {
+		var wallHeight float64
+
+		for g.maze[int(dot.y)][int(dot.x)] == 0 {
 			if sideDistX < sideDistY {
 				sideDistX += deltaDistX
 				dot.x += float64(stepX)
@@ -155,36 +156,45 @@ func (g *Game) DrawWalls(screen *ebiten.Image) {
 				wallVert = true
 			}
 		}
-		if wallVert {
-			x := math.Abs(screenWidth/2 - i)
-			wallHigh = screenHeight / ((perpenDist * math.Sqrt(float64(1+x*x))) / x)
-			vector.StrokeLine(screen, float32(i), float32(screenHeight/2), float32(i), float32(screenHeight/2+wallHigh/2), 1, color.RGBA{10, 200, 10, 200}, false)
-			vector.StrokeLine(screen, float32(i), float32(screenHeight/2), float32(i), float32(screenHeight/2-wallHigh/2), 1, color.RGBA{10, 200, 10, 200}, false)
+		if !wallVert {
+		perpWallDist = sideDistX - deltaDistX
 		} else {
-			x := math.Abs(screenWidth/2 - i)
-			wallHigh = screenHeight / (perpenDist * math.Sqrt(float64(1+x*x)))
-			vector.StrokeLine(screen, float32(i), float32(screenHeight/2), float32(i), float32(screenHeight/2+wallHigh/2), 1, color.RGBA{10, 200, 10, 200}, false)
-			vector.StrokeLine(screen, float32(i), float32(screenHeight/2), float32(i), float32(screenHeight/2-wallHigh/2), 1, color.RGBA{10, 200, 10, 200}, false)
+			perpWallDist = sideDistY - deltaDistY
 		}
+		if ebiten.IsKeyPressed(ebiten.KeyF) {
+			perpWallDist *= math.Sqrt(1 + math.Pow(math.Sqrt(math.Pow(ray.x, 2)+math.Pow(ray.y, 2)), 2))
+		}
+			wallHeight = screenHeight /perpWallDist
+			drawStart := -wallHeight/ 2 + screenHeight / 2
+		if drawStart < 0{
+			drawStart = 0
+		}
+		drawEnd := wallHeight/ 2 + screenHeight / 2
+		if drawEnd >= screenHeight{
+			drawEnd = screenHeight - 1
+		}
+		
+
+	vector.StrokeLine(screen, float32(i),float32(drawStart),float32(i),float32(drawEnd),1,color.RGBA{0, 180, 0, 255},false)
 	}
 }
 
 func (g *Game) perpendicul() float64 {
+	var dist float64
 	cameraX := 2*(screenWidth/2)/float64(screenWidth) - 1
 	ray := Point{g.playerEyesDir.x + g.fov.x*cameraX, g.playerEyesDir.y + g.fov.y*cameraX}
 	dot := Point{math.Floor(g.player.x), math.Floor(g.player.y)}
 	deltaDistX, deltaDistY := float64(math.Abs(1/ray.x)), float64(math.Abs(1/ray.y))
 	stepX, stepY, sideDistX, sideDistY := g.startDists(ray, dot, deltaDistX, deltaDistY)
-	dist := sideDistX + sideDistY
-	for g.maze[int(dot.y)/g.mazeScale][int(dot.x)/g.mazeScale] == 0 {
+	for g.maze[int(dot.y)/mazeScale][int(dot.x)/mazeScale] == 0 {
 		if sideDistX < sideDistY {
 			sideDistX += deltaDistX
 			dot.x += float64(stepX)
-			dist += deltaDistX
+			dist = sideDistX
 		} else {
 			sideDistY += deltaDistY
 			dot.y += float64(stepY)
-			dist += deltaDistY
+			dist = sideDistY
 		}
 	}
 	return dist
@@ -216,10 +226,9 @@ func NewGame(width, height int) *Game {
 			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 			{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 		},
-		mazeScale:     15,
-		player:        Point{20, 20},
+		player:        Point{1.5, 1.5},
 		playerEyesDir: Point{-1, 0},
-		fov:           Point{0.3, 0.3},
+		fov:           Point{0, 0.3},
 	}
 }
 
