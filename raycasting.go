@@ -8,6 +8,7 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
 //-----------------------Copyright-Notice----------------------------
@@ -23,14 +24,15 @@ const (
 )
 
 type Game struct {
-	screenBuffer  *ebiten.Image
-	width, height int //screen width and height [in pixels]
+	mapScreenBuffer *ebiten.Image
+	width, height   int //screen width and height [in pixels]
 	//variables
 	gameMap   [][]int   //game map 2d matrix
 	playerPos vector    //player position [in cells]
 	viewDir   vector    //player view direction
 	cellSize  float64   //[in pixels] (not in 'draw' due use in 'update')
 	pt        time.Time //previous frame time (for movement)
+	drawMap   bool      //draw map screen or not
 }
 
 //line with start & end points
@@ -45,6 +47,10 @@ type vector struct {
 //---------------------------Update-------------------------------------
 
 func (g *Game) Update() error {
+
+	if inpututil.IsKeyJustPressed(ebiten.KeyTab) {
+		g.drawMap = !g.drawMap //switch map screen drawing
+	}
 
 	//Time
 	ft := time.Now().Sub(g.pt).Seconds() //difference from cur frame and last saved
@@ -88,7 +94,6 @@ func (g *Game) Update() error {
 	if ebiten.IsKeyPressed(ebiten.KeyArrowRight) {
 		g.viewDir = rotate(g.viewDir, math.Pi/200*rspd)
 	}
-
 	return nil
 }
 
@@ -114,23 +119,23 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	//----Screen-Buffer----
 	//---------------------
 
-	if g.screenBuffer == nil {
-		g.screenBuffer = ebiten.NewImage(g.width, g.height) // creating buffer if we don't have one
+	if g.mapScreenBuffer == nil {
+		g.mapScreenBuffer = ebiten.NewImage(g.width, g.height) // creating buffer if we don't have one
 	}
-	g.screenBuffer.Clear() //clearing previous screen to draw everything one more time
+	g.mapScreenBuffer.Clear() //clearing previous screen to draw everything one more time
 
 	//---------------------
 	//-----Map-Drawing-----
 	//---------------------
 
-	ebitenutil.DrawRect(g.screenBuffer, mapPos.x, mapPos.y, mW, mH, color.RGBA{50, 50, 50, 255} /*Grey*/) //map background
+	ebitenutil.DrawRect(g.mapScreenBuffer, mapPos.x, mapPos.y, mW, mH, color.RGBA{50, 50, 50, 255} /*Grey*/) //map background
 
 	//draw cell with proper color
 	drawCell := func(ci, cj float64, clr color.RGBA) { //ci & cj - cell index in gameMap [player coordinates]
 		//map position [world coordinates]  +  cell position [world coordinates]
 		cX := mapPos.x + (cj * g.cellSize)
 		cY := mapPos.y + (ci * g.cellSize)
-		ebitenutil.DrawRect(g.screenBuffer, cX, cY, g.cellSize, g.cellSize, clr)
+		ebitenutil.DrawRect(g.mapScreenBuffer, cX, cY, g.cellSize, g.cellSize, clr)
 	}
 
 	//draw map cells
@@ -174,7 +179,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 		res := scale(r, g.DDA(r)*g.cellSize) //calculate ray length
 
-		ebitenutil.DrawLine(g.screenBuffer, playerPixelPos.x, playerPixelPos.y, playerPixelPos.x+res.x, playerPixelPos.y+res.y, color.RGBA{242, 207, 85, 200} /*Yellow*/) //draw ray
+		ebitenutil.DrawLine(g.mapScreenBuffer, playerPixelPos.x, playerPixelPos.y, playerPixelPos.x+res.x, playerPixelPos.y+res.y, color.RGBA{242, 207, 85, 200} /*Yellow*/) //draw ray
 	}
 
 	//---------------------
@@ -182,44 +187,48 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	//---------------------
 
 	//player view line drawing
-	ebitenutil.DrawLine(g.screenBuffer, playerPixelPos.x, playerPixelPos.y, playerPixelPos.x+scale(g.viewDir, viewLen).x, playerPixelPos.y+scale(g.viewDir, viewLen).y, color.RGBA{255, 146, 28, 200} /*Orange*/)
+	ebitenutil.DrawLine(g.mapScreenBuffer, playerPixelPos.x, playerPixelPos.y, playerPixelPos.x+scale(g.viewDir, viewLen).x, playerPixelPos.y+scale(g.viewDir, viewLen).y, color.RGBA{255, 146, 28, 200} /*Orange*/)
 
 	//camera plane line drawing
-	ebitenutil.DrawLine(g.screenBuffer, playerPixelPos.x+camPlane.a.x, playerPixelPos.y+camPlane.a.y, playerPixelPos.x+camPlane.b.x, playerPixelPos.y+camPlane.b.y, color.RGBA{132, 132, 255, 200} /*Blue*/)
+	ebitenutil.DrawLine(g.mapScreenBuffer, playerPixelPos.x+camPlane.a.x, playerPixelPos.y+camPlane.a.y, playerPixelPos.x+camPlane.b.x, playerPixelPos.y+camPlane.b.y, color.RGBA{132, 132, 255, 200} /*Blue*/)
 	//adding player position to convert from player coordinates to world coordinates
 
 	//Draw player
-	ebitenutil.DrawCircle(g.screenBuffer, playerPixelPos.x, playerPixelPos.y, 10, color.RGBA{100, 180, 255, 255} /*Light blue*/)
+	ebitenutil.DrawCircle(g.mapScreenBuffer, playerPixelPos.x, playerPixelPos.y, 10, color.RGBA{100, 180, 255, 255} /*Light blue*/)
 
 	//---------------------
 	//----Screen-Drawing---
 	//---------------------
 
-	// var opts ebiten.DrawImageOptions                    //declaring screen operations
-	// opts.GeoM.Translate(-g.playerPos.x, -g.playerPos.y) // converting screen world coordinates to player's coordinates
+	var opts ebiten.DrawImageOptions                          //declaring screen operations
+	opts.GeoM.Translate(-playerPixelPos.x, -playerPixelPos.y) // converting screen world coordinates to player's coordinates
 
-	// //rotation
-	// var m ebiten.GeoM //declaring matrix
-	// /*
-	// 	00 10
-	// 	a  b
-	// 	01 11
-	// 	c  d
-	// */
-	// //setting matrix
-	// //90° rotation = [x,y] -> [-y,x]
-	// m.SetElement(0, 0, -g.viewDir.y) //a (-| viewdir.x)
-	// m.SetElement(0, 1, g.viewDir.x)  //b (-| viewdir.y)
-	// m.SetElement(1, 0, g.viewDir.x)  //c (viewdir.x)
-	// m.SetElement(1, 1, g.viewDir.y)  //d (viewdir.y)
-	// m.Invert()                       //taking inverse matrix
-	// opts.GeoM.Concat(m)              //multiplying "opts matrix" with "our matrix"
-	// opts.GeoM.Scale(1, -1)           // scaling matrix for proper player movement & rotation
+	//rotation
+	var m ebiten.GeoM //declaring matrix
+	/*
+		00 10
+		a  b
+		01 11
+		c  d
+	*/
+	//setting matrix
+	//90° rotation = [x,y] -> [-y,x]
+	m.SetElement(0, 0, -g.viewDir.y) //a (-| viewdir.x)
+	m.SetElement(0, 1, g.viewDir.x)  //b (-| viewdir.y)
+	m.SetElement(1, 0, g.viewDir.x)  //c (viewdir.x)
+	m.SetElement(1, 1, g.viewDir.y)  //d (viewdir.y)
+	m.Invert()                       //taking inverse matrix
+	opts.GeoM.Concat(m)              //multiplying "opts matrix" with "our matrix"
+	opts.GeoM.Scale(1, -1)           // scaling matrix for proper player movement & rotation
 
-	// opts.GeoM.Translate(float64(screen.Bounds().Max.X)/2, float64(screen.Bounds().Max.Y)/2) //centering the screen
-	// screen.DrawImage(g.screenBuffer, &opts)                                                 //drawing screen buffer
+	//map screen adjustments
+	scale := 0.4
+	opts.GeoM.Scale(scale, scale)
+	opts.GeoM.Translate((float64(screen.Bounds().Max.Y)*scale)/2, (float64(screen.Bounds().Max.Y)*scale)/2) //placing map screen in top left corner
 
-	screen.DrawImage(g.screenBuffer, nil) //drawing static screen buffer
+	if g.drawMap {
+		screen.DrawImage(g.mapScreenBuffer, &opts) //drawing map screen buffer
+	}
 
 }
 
@@ -353,11 +362,11 @@ func main() {
 // New game instance function
 func NewGame(width, height int) *Game {
 
-	//playerPos := vector{(sW / 2) - 10, (sH / 2) - 10} //player initial position [in pixels]
 	playerPos := vector{12, 12} //player initial position [in cells]
 	viewDir := vector{0, -1}    //player view direction unit vector [in cells]
 	cellSize := 25.0            // size of each cell [in pixels] (not in 'draw' due use in 'update')
 	pt := time.Now()            //previous frame time (for movement)
+	drawMap := true
 
-	return &Game{width: width, height: height, gameMap: initGameMap(), playerPos: playerPos, viewDir: viewDir, cellSize: cellSize, pt: pt}
+	return &Game{width: width, height: height, gameMap: initGameMap(), playerPos: playerPos, viewDir: viewDir, cellSize: cellSize, pt: pt, drawMap: drawMap}
 }
