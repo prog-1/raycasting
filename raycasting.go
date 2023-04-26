@@ -4,6 +4,7 @@ import (
 	"image/color"
 	"log"
 	"math"
+	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
@@ -17,25 +18,19 @@ import (
 //-------------------------Declaration------------------------------
 
 const (
-	sW       = 1280 //screen width
-	sH       = 720  //screen height
-	mW       = 600  //map width
-	mH       = 600  //map height
-	cellSize = 25   // size of each cell in pixels
-	viewLen  = 150  //lenght of player view and camera plane lines
-	//if len of viewDir = len of camPlane, then FoV = 90 degrees
-	segNumber = 100 // number of segments of camera plane line for rays
-	playerCol = 10  //player collision size
+	sW = 1280 //screen width [in pixels]
+	sH = 720  //screen height [in pixels]
 )
 
 type Game struct {
 	screenBuffer  *ebiten.Image
-	width, height int //screen width and height
-	//global variables
-	gameMap   [][]int //game map 2d matrix
-	mapPos    vector  //map position on the screen (top left corner)
-	playerPos vector  //player position
-	viewDir   vector  //player view direction
+	width, height int //screen width and height [in pixels]
+	//variables
+	gameMap   [][]int   //game map 2d matrix
+	playerPos vector    //player position [in cells]
+	viewDir   vector    //player view direction
+	cellSize  float64   //[in pixels] (not in 'draw' due use in 'update')
+	pt        time.Time //previous frame time (for movement)
 }
 
 //line with start & end points
@@ -51,35 +46,47 @@ type vector struct {
 
 func (g *Game) Update() error {
 
+	//Time
+	ft := time.Now().Sub(g.pt).Seconds() //difference from cur frame and last saved
+	g.pt = time.Now()                    //updating previous frame time
+	mspd := ft * 80                      //movement speed
+	rspd := ft * 100                     //rotation speed
+
+	move := func(nextPos vector) {
+		//collision handling
+		if g.gameMap[int(g.playerPos.y)][int(nextPos.x)] == 0 { //if there is air when we move more along x
+			g.playerPos.x = nextPos.x // move along x
+		}
+		if g.gameMap[int(nextPos.y)][int(g.playerPos.x)] == 0 { //if there is air when we move more along y
+			g.playerPos.y = nextPos.y // move along y
+		}
+	}
+
 	//Player WASD Movement
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
-		//collision handling
-		if nextPos := add(g.playerPos, scale(g.viewDir, playerCol)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 { //if next position of the player is not the wall
-			//g.playerPos = add(g.playerPos, divide(g.viewDir, viewLen))
-			g.playerPos = add(g.playerPos, g.viewDir)
-			//adding viewDir to playerPos to move forward on 1 pixel
-		}
+		nextPos := add(g.playerPos, scale(scale(g.viewDir, 1/g.cellSize), mspd)) // nextPos = playerPos + viewdir*(1/25)
+		move(nextPos)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		if nextPos := subtract(g.playerPos, scale(g.viewDir, playerCol)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 {
-			g.playerPos = subtract(g.playerPos, g.viewDir) //same as W, but subtracting viewDir
-		}
+		//same as W, bust substracting viewdir from player pos
+		nextPos := subtract(g.playerPos, scale(scale(g.viewDir, 1/g.cellSize), mspd)) // nextPos = playerPos - viewdir*(1/25)
+		move(nextPos)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		if nextPos := add(g.playerPos, rotate(scale(g.viewDir, playerCol), -math.Pi/2)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 {
-			g.playerPos = add(g.playerPos, rotate(g.viewDir, -math.Pi/2)) //rotating on 90 before adding
-		}
+		//rotating on 90 before adding
+		nextPos := add(g.playerPos, rotate(scale(scale(g.viewDir, 1/g.cellSize), mspd), -math.Pi/2)) // nextPos = playerPos + viewdir*(1/25) on +90°
+		move(nextPos)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		if nextPos := add(g.playerPos, rotate(scale(g.viewDir, playerCol), math.Pi/2)); g.gameMap[int((nextPos.y-g.mapPos.y)/cellSize)][int((nextPos.x-g.mapPos.x)/cellSize)] == 0 {
-			g.playerPos = add(g.playerPos, rotate(g.viewDir, math.Pi/2)) //rotating on -90 before adding
-		}
+		//rotating on -90 before adding
+		nextPos := add(g.playerPos, rotate(scale(scale(g.viewDir, 1/g.cellSize), mspd), math.Pi/2)) // nextPos = playerPos + viewdir*(1/25) on -90°
+		move(nextPos)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) {
-		g.viewDir = rotate(g.viewDir, -math.Pi/200)
+		g.viewDir = rotate(g.viewDir, -math.Pi/200*rspd)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyArrowRight) {
-		g.viewDir = rotate(g.viewDir, math.Pi/200)
+		g.viewDir = rotate(g.viewDir, math.Pi/200*rspd)
 	}
 
 	return nil
@@ -89,15 +96,42 @@ func (g *Game) Update() error {
 
 func (g *Game) Draw(screen *ebiten.Image) {
 
-	// # Screen buffer #
+	//---------------------
+	//-----Declaration-----
+	//---------------------
+
+	mW := 600.0 //map width [in pixels]
+	mH := 600.0 //map height [in pixels]
+
+	viewLen := 150.0 //lenght of player view and camera plane lines [in pixels]
+	//if len of viewDir = len of camPlane, then FoV = 90 degrees
+	mapPos := vector{(sW / 2) - (mW / 2), (sH / 2) - (mH / 2)} // map position on the screen (top left corner) [world coordinates]
+	segNumber := 100.0                                         // number of segments of camera plane line for rays
+
+	playerPixelPos := vector{(g.playerPos.x * g.cellSize) + mapPos.x, (g.playerPos.y * g.cellSize) + mapPos.y} // player position [in pixels]
+
+	//---------------------
+	//----Screen-Buffer----
+	//---------------------
+
 	if g.screenBuffer == nil {
 		g.screenBuffer = ebiten.NewImage(g.width, g.height) // creating buffer if we don't have one
 	}
 	g.screenBuffer.Clear() //clearing previous screen to draw everything one more time
 
-	//###
-	//draw map background
-	ebitenutil.DrawRect(g.screenBuffer, g.mapPos.x, g.mapPos.y, mW, mH, color.RGBA{50, 50, 50, 255} /*Grey*/)
+	//---------------------
+	//-----Map-Drawing-----
+	//---------------------
+
+	ebitenutil.DrawRect(g.screenBuffer, mapPos.x, mapPos.y, mW, mH, color.RGBA{50, 50, 50, 255} /*Grey*/) //map background
+
+	//draw cell with proper color
+	drawCell := func(ci, cj float64, clr color.RGBA) { //ci & cj - cell index in gameMap [player coordinates]
+		//map position [world coordinates]  +  cell position [world coordinates]
+		cX := mapPos.x + (cj * g.cellSize)
+		cY := mapPos.y + (ci * g.cellSize)
+		ebitenutil.DrawRect(g.screenBuffer, cX, cY, g.cellSize, g.cellSize, clr)
+	}
 
 	//draw map cells
 	for i := range g.gameMap { //for each column
@@ -106,25 +140,27 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 			//If current cell is wall
 			if g.gameMap[i][j] == 1 {
-				drawCell(g.screenBuffer, g.mapPos, i, j, color.RGBA{200, 200, 200, 255} /*Light grey*/)
+				drawCell(float64(i), float64(j), color.RGBA{200, 200, 200, 255} /*Light grey*/)
 
 			} else if g.gameMap[i][j] == 2 {
-				drawCell(g.screenBuffer, g.mapPos, i, j, color.RGBA{255, 0, 0, 255} /*Red*/)
+				drawCell(float64(i), float64(j), color.RGBA{255, 0, 0, 255} /*Red*/)
 			}
 
 		}
 	}
 
-	//Draw player
-	ebitenutil.DrawCircle(g.screenBuffer, g.playerPos.x, g.playerPos.y, playerCol, color.RGBA{100, 180, 255, 255} /*Light blue*/)
-
-	//# FIELD OF VIEW #
+	//---------------------
+	//----Field-of-View----
+	//---------------------
 
 	camA := add(scale(g.viewDir, viewLen), rotate(scale(g.viewDir, viewLen), math.Pi/2))  //first camera point
 	camB := add(scale(g.viewDir, viewLen), rotate(scale(g.viewDir, viewLen), -math.Pi/2)) //last camera point
 	camPlane := line{camA, camB}                                                          //camera plane line
 
-	//# Ray Drawing #
+	//---------------------
+	//-----Ray-Drawing-----
+	//---------------------
+
 	//segment length for each projection
 	segLenX := (camPlane.b.x - camPlane.a.x) / segNumber
 	segLenY := (camPlane.b.y - camPlane.a.y) / segNumber
@@ -134,25 +170,31 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		var r vector //ray point on camPlane
 		r.x = (camPlane.a.x + (segLenX * i))
 		r.y = (camPlane.a.y + (segLenY * i))
-		r = norm(r) //ray unit vector
+		r = norm(r) //ray direction unit vector
 
-		//pmp := divide(subtract(g.playerPos, g.mapPos), cellSize) //player map position
-		res := scale(r, g.DDA(r))                                                                                                                             //calculate ray length
-		ebitenutil.DrawLine(g.screenBuffer, g.playerPos.x, g.playerPos.y, g.playerPos.x+res.x, g.playerPos.y+res.y, color.RGBA{242, 207, 85, 200} /*Yellow*/) //draw ray
+		res := scale(r, g.DDA(r)*g.cellSize) //calculate ray length
+
+		ebitenutil.DrawLine(g.screenBuffer, playerPixelPos.x, playerPixelPos.y, playerPixelPos.x+res.x, playerPixelPos.y+res.y, color.RGBA{242, 207, 85, 200} /*Yellow*/) //draw ray
 	}
 
-	//player's location in map
-	//fmt.Println(divide(subtract(g.playerPos, g.mapPos), cellSize))
+	//---------------------
+	//--------Debug--------
+	//---------------------
 
 	//player view line drawing
-	ebitenutil.DrawLine(g.screenBuffer, g.playerPos.x, g.playerPos.y, g.playerPos.x+scale(g.viewDir, viewLen).x, g.playerPos.y+scale(g.viewDir, viewLen).y, color.RGBA{255, 146, 28, 200} /*Orange*/)
+	ebitenutil.DrawLine(g.screenBuffer, playerPixelPos.x, playerPixelPos.y, playerPixelPos.x+scale(g.viewDir, viewLen).x, playerPixelPos.y+scale(g.viewDir, viewLen).y, color.RGBA{255, 146, 28, 200} /*Orange*/)
 
 	//camera plane line drawing
-	ebitenutil.DrawLine(g.screenBuffer, g.playerPos.x+camPlane.a.x, g.playerPos.y+camPlane.a.y, g.playerPos.x+camPlane.b.x, g.playerPos.y+camPlane.b.y, color.RGBA{132, 132, 255, 200} /*Blue*/)
+	ebitenutil.DrawLine(g.screenBuffer, playerPixelPos.x+camPlane.a.x, playerPixelPos.y+camPlane.a.y, playerPixelPos.x+camPlane.b.x, playerPixelPos.y+camPlane.b.y, color.RGBA{132, 132, 255, 200} /*Blue*/)
 	//adding player position to convert from player coordinates to world coordinates
 
-	//###
-	// # DRAWING SCREEN #
+	//Draw player
+	ebitenutil.DrawCircle(g.screenBuffer, playerPixelPos.x, playerPixelPos.y, 10, color.RGBA{100, 180, 255, 255} /*Light blue*/)
+
+	//---------------------
+	//----Screen-Drawing---
+	//---------------------
+
 	// var opts ebiten.DrawImageOptions                    //declaring screen operations
 	// opts.GeoM.Translate(-g.playerPos.x, -g.playerPos.y) // converting screen world coordinates to player's coordinates
 
@@ -175,44 +217,42 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// opts.GeoM.Scale(1, -1)           // scaling matrix for proper player movement & rotation
 
 	// opts.GeoM.Translate(float64(screen.Bounds().Max.X)/2, float64(screen.Bounds().Max.Y)/2) //centering the screen
-	//screen.DrawImage(g.screenBuffer, &opts)                                                 //drawing screen buffer
-	screen.DrawImage(g.screenBuffer, nil) //drawing screen buffer
+	// screen.DrawImage(g.screenBuffer, &opts)                                                 //drawing screen buffer
+
+	screen.DrawImage(g.screenBuffer, nil) //drawing static screen buffer
 
 }
 
 //-------------------------Functions----------------------------------
 
-//DDA - calculates length of the ray
-//inputs unit (direction) vector.
-//outputs length of the ray
+// DDA - calculates length of the ray [in cells]
+// inputs unit (direction) vector
 func (g Game) DDA(v vector) (rayLen float64) {
 
-	pmp := scale(subtract(g.playerPos, g.mapPos), 1.0/cellSize) //player map position
+	var curCell vector                    //current cell [in cells]
+	curCell.x = math.Trunc(g.playerPos.x) //pmp.x - frac.x
+	curCell.y = math.Trunc(g.playerPos.y) //pmp.y - frac.y
 
-	var curCell vector            //current cell
-	curCell.x = math.Trunc(pmp.x) //pmp.x - frac.x
-	curCell.y = math.Trunc(pmp.y) //pmp.y - frac.y
-
-	var step vector            //distance to row and column of ray in cell (vRayUnitStepSize)
+	var step vector            //distance to row and column of ray in cell [in cells]
 	step.x = math.Abs(1 / v.x) // √ 1^2 + k^2
 	step.y = math.Abs(1 / v.y) // √ 1^2 + (1/k)^2
 
-	var dist vector //initial distance to first row and column (vRayLength1D)
+	var dist vector //initial distance to first row and column [in cells]
 
-	var mapd vector //step where to go on each direction (vStep)
+	var mapd vector //step where to go on each direction [in cells]
 	if v.x < 0 {
 		mapd.x = -1
-		dist.x = (pmp.x - curCell.x) * step.x
+		dist.x = (g.playerPos.x - curCell.x) * step.x
 	} else {
 		mapd.x = 1
-		dist.x = (curCell.x + 1 - pmp.x) * step.x //right neighbor cell - player x
+		dist.x = (curCell.x + 1 - g.playerPos.x) * step.x //right neighbor cell - player x
 	}
 	if v.y < 0 {
 		mapd.y = -1
-		dist.y = (pmp.y - curCell.y) * step.y
+		dist.y = (g.playerPos.y - curCell.y) * step.y
 	} else {
 		mapd.y = 1
-		dist.y = (curCell.y + 1 - pmp.y) * step.y //bottom neighbor cell - player y
+		dist.y = (curCell.y + 1 - g.playerPos.y) * step.y //bottom neighbor cell - player y
 	}
 
 	for {
@@ -226,60 +266,43 @@ func (g Game) DDA(v vector) (rayLen float64) {
 			curCell.y += mapd.y
 		}
 		if g.gameMap[int(curCell.y)][int(curCell.x)] != 0 {
-			return rayLen * cellSize
+			return rayLen
 		}
 	}
 }
 
-//normalize - converts vector to unit vector
-func norm(v vector) (res vector) {
+// normalize - converts vector to unit vector
+func norm(v vector) vector {
 	mod := mod(v)
-	res.x = v.x / mod
-	res.y = v.y / mod
-	return res
+	return vector{x: v.x / mod, y: v.y / mod}
 }
 
-//returns module (length) of the vector
+// returns module (length) of the vector
 func mod(v vector) float64 {
 	return math.Sqrt((v.x * v.x) + (v.y * v.y))
 }
 
-func rotate(p vector, angle float64) (res vector) {
-
+func rotate(p vector, angle float64) vector {
 	sin, cos := math.Sincos(angle)
-
-	//Rotation
-	res.x = p.x*cos - p.y*sin
-	res.y = p.x*sin + p.y*cos
-
-	return res
+	return vector{
+		x: p.x*cos - p.y*sin,
+		y: p.x*sin + p.y*cos}
 }
 
-func subtract(a, b vector) (res vector) {
-	return vector{a.x - b.x, a.y - b.y}
+func subtract(a, b vector) vector {
+	return vector{x: a.x - b.x, y: a.y - b.y}
 }
 
-func add(a, b vector) (res vector) {
-	res.x = a.x + b.x
-	res.y = a.y + b.y
-	return res
+func add(a, b vector) vector {
+	return vector{x: a.x + b.x, y: a.y + b.y}
 }
 
-func scale(a vector, v float64) (res vector) { //v - value
-	return vector{a.x * v, a.y * v}
-}
-
-// draw cell with proper color
-func drawCell(screen *ebiten.Image, mapPos vector, ci, cj int, clr color.RGBA) { //ci & cj - cell index in gameMap
-
-	//  map position  +  cell position
-	cX := mapPos.x + float64((cj * cellSize))
-	cY := mapPos.y + float64((ci * cellSize))
-	ebitenutil.DrawRect(screen, cX, cY, cellSize, cellSize, clr)
+func scale(a vector, v float64) vector { //v - value
+	return vector{x: a.x * v, y: a.y * v}
 }
 
 func initGameMap() [][]int {
-	return [][]int{
+	return [][]int{ //24 x 24 cells
 		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
@@ -330,9 +353,11 @@ func main() {
 // New game instance function
 func NewGame(width, height int) *Game {
 
-	mapPos := vector{(sW / 2) - (mW / 2), (sH / 2) - (mH / 2)} // map position
-	playerStartPos := vector{(sW / 2) - 10, (sH / 2) - 10}     //player initial position
-	viewDir := vector{0, -1 /*prev: -viewLen*/}                //player view direction unit vector
+	//playerPos := vector{(sW / 2) - 10, (sH / 2) - 10} //player initial position [in pixels]
+	playerPos := vector{12, 12} //player initial position [in cells]
+	viewDir := vector{0, -1}    //player view direction unit vector [in cells]
+	cellSize := 25.0            // size of each cell [in pixels] (not in 'draw' due use in 'update')
+	pt := time.Now()            //previous frame time (for movement)
 
-	return &Game{width: width, height: height, gameMap: initGameMap(), mapPos: mapPos, playerPos: playerStartPos, viewDir: viewDir /*camPlane: camPlane*/}
+	return &Game{width: width, height: height, gameMap: initGameMap(), playerPos: playerPos, viewDir: viewDir, cellSize: cellSize, pt: pt}
 }
