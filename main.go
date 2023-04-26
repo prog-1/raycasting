@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"image/color"
 	"log"
 	"math"
@@ -40,6 +39,7 @@ type game struct {
 	P    Player
 	RC   int   //Ray Count
 	pft  int64 // Previous frame time
+	f    bool  // Fisheye(true - on, false - off)
 }
 
 func FlipVertically(out *[][]int) {
@@ -89,6 +89,7 @@ func NewGame() *game {
 		},
 		RC:  201,
 		pft: 0,
+		f:   false,
 	}
 
 	FlipVertically(&g.Maze)
@@ -160,6 +161,15 @@ func (g *game) Update() error {
 	if ebiten.IsKeyPressed(ebiten.KeyE) {
 		g.P.Dir = RotateZ(g.P.Dir, -g.P.rs*dt)
 	}
+
+	// Toggling fisheye:
+	if ebiten.IsKeyPressed(ebiten.KeyF) {
+		g.f = true
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyG) {
+		g.f = false
+	}
+
 	return nil
 }
 
@@ -173,15 +183,16 @@ func getPerPendicularToCameraPlane(l float64, p *Player) float64 {
 	// How to calculate d?
 	// d = 1/cos(FOV/2)
 	// https://prnt.sc/d2ipuW31vFTt
-	r := l / (1 / math.Cos(p.FOV/2))
-	return r
+	return l / (1 / math.Cos(p.FOV/2))
 }
 
+var debug = ebiten.NewImage(sw, sh)
 var mb, wb = ebiten.NewImage(sw, sh), ebiten.NewImage(sw, sh) // Minimap and world buffers
 func (g *game) Draw(screen *ebiten.Image) {
 	screen.Clear()
 	mb.Clear()
 	wb.Clear()
+	debug.Clear()
 
 	drawLine := func(s *ebiten.Image, a, b *vector2.Vector2, clr color.Color) {
 		u, v := a.MulScalar(cs), b.MulScalar(cs)
@@ -220,9 +231,14 @@ func (g *game) Draw(screen *ebiten.Image) {
 		drawLine(mb, g.P.Pos, g.P.Pos.Add(d.MulScalar(l)), color.RGBA{255, 255, 0, 255})
 		// Pseudo 3D:
 		const sch = float64(sh) / cs // Screen cell height(in cells)
-		lh1 := sch / l
-		fmt.Println(lh1)
-		lh := sch / getPerPendicularToCameraPlane(l, &g.P) // Wall line height(in cells)
+		var lh float64               // Wall line height(in cells)
+		if g.f {                     // Drawing with fisheye
+			lh = sch / l
+			ebitenutil.DebugPrint(debug, "on")
+		} else {
+			lh = sch / getPerPendicularToCameraPlane(l, &g.P)
+			ebitenutil.DebugPrint(debug, "off")
+		}
 		if lh > sch {
 			lh = sch
 		}
@@ -250,6 +266,8 @@ func (g *game) Draw(screen *ebiten.Image) {
 	opts.GeoM.Scale(-1, -1)                                                  // Flipping
 	opts.GeoM.Translate(float64(len(g.Maze[0]))*cs, float64(len(g.Maze))*cs) // Moving coord. center to screen center
 	screen.DrawImage(mb, &opts)
+	// Debug:
+	screen.DrawImage(debug, &ebiten.DrawImageOptions{})
 }
 
 // Returns length of the ray casted from the point p in the direction of d to the wall in the map m
