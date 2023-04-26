@@ -173,17 +173,17 @@ func (g *game) Update() error {
 	return nil
 }
 
-// l - ray's length to intersection
-func getPerPendicularToCameraPlane(l float64, p *Player) float64 {
+// l - ray's length to intersection, rad - angle by which we need to rotate player's directional vector in order to align it with the ray
+func getPerPendicularToCameraPlane(l float64, rad float64) float64 {
 	// How to get rid of the fisheye effect?
 	// When calculating wall's heigth instead of distance from the player to the wall use distance(perpendicular) to the camera plane
 	// How to find perpendicular(p)?
 	// p = l/d, where l - length of the ray and d - side of the player's view sector(triangle) with height adjacent to base = 1
 	// https://prnt.sc/EpuLZAFM4pKU
 	// How to calculate d?
-	// d = 1/cos(FOV/2)
-	// https://prnt.sc/d2ipuW31vFTt
-	return l / (1 / math.Cos(p.FOV/2))
+	// d = 1/cos(alfa/2)
+	// https://prnt.sc/9JRBfeoi3TI_
+	return l / (1 / math.Cos(rad))
 }
 
 var debug = ebiten.NewImage(sw, sh)
@@ -236,7 +236,7 @@ func (g *game) Draw(screen *ebiten.Image) {
 			lh = sch / l
 			ebitenutil.DebugPrint(debug, "on")
 		} else {
-			lh = sch / getPerPendicularToCameraPlane(l, &g.P)
+			lh = sch / getPerPendicularToCameraPlane(l, rad)
 			ebitenutil.DebugPrint(debug, "off")
 		}
 		if lh > sch {
