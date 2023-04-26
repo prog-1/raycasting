@@ -98,28 +98,28 @@ func (g *Game) DrawFieldOfView(screen *ebiten.Image) {
 func (g *Game) DrawWalls(screen *ebiten.Image) {
 	for i := 0; i < screenWidth; i++ {
 		cameraX := 2*float64(i)/float64(screenWidth) - 1
-		rayDirX, rayDirY := g.dir.x+g.fov.x*cameraX, g.dir.x+g.fov.y*cameraX
+		rayDirX, rayDirY := g.dir.x+g.fov.x*cameraX, g.dir.y+g.fov.y*cameraX
 		mapX, mapY := g.playerPos.x, g.playerPos.y
 		deltaDistX, deltaDistY := math.Abs(1/rayDirX), math.Abs(1/rayDirY)
 		var sideDistX, sideDistY, stepX, stepY, perpWallDist float64
 		var side int
 		hit := 0
-		if rayDirX < 0 {
-			stepX = -1
-			sideDistX = (g.playerPos.x - mapX) * deltaDistX
-		} else {
-			stepX = 1
-			sideDistX = (mapX + 1.0 - g.playerPos.x) * deltaDistX
-		}
-		if rayDirY < 0 {
-			stepY = -1
-			sideDistY = (g.playerPos.y - mapY) * deltaDistY
-		} else {
-			stepY = 1
-			sideDistY = (mapY + 1.0 - g.playerPos.y) * deltaDistY
-		}
-
 		for hit == 0 {
+			if rayDirX < 0 {
+				stepX = -1
+				sideDistX = (g.playerPos.x - mapX) * deltaDistX
+			} else {
+				stepX = 1
+				sideDistX = (mapX + 1.0 - g.playerPos.x) * deltaDistX
+			}
+			if rayDirY < 0 {
+				stepY = -1
+				sideDistY = (g.playerPos.y - mapY) * deltaDistY
+			} else {
+				stepY = 1
+				sideDistY = (mapY + 1.0 - g.playerPos.y) * deltaDistY
+			}
+
 			if sideDistX < sideDistY {
 				sideDistX += deltaDistX
 				mapX += stepX
