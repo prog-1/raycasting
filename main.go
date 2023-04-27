@@ -9,6 +9,7 @@ import (
 	"github.com/deeean/go-vector/vector2"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
 const (
@@ -167,11 +168,8 @@ func (g *Game) Update() error {
 	}
 
 	// Toggling fisheye:
-	if ebiten.IsKeyPressed(ebiten.KeyF) {
-		g.f = true
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyG) {
-		g.f = false
+	if inpututil.IsKeyJustPressed(ebiten.KeyF) {
+		g.f = !g.f
 	}
 
 	return nil
