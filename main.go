@@ -27,6 +27,9 @@ type Game struct {
 	player        Point
 	playerEyesDir Point
 	fov           Point
+	wallColorsMinimap map[int]color.RGBA
+	wallColors map[int]color.RGBA
+	wallColorsVert map[int]color.RGBA
 }
 
 func rotate(p Point, angle float64) Point {
@@ -85,10 +88,10 @@ func (g *Game) Update() error {
 
 func (g *Game) Draw(screen *ebiten.Image) {
 	// if ebiten.IsKeyPressed(ebiten.KeyM) {
-	g.DrawWalls(screen)
-	g.DrawMinimap(screen)
-	g.DrawPlayer(screen)
-	g.DrawFov(screen)
+		g.DrawWalls(screen)
+		g.DrawFov(screen)
+		g.DrawPlayer(screen)
+		g.DrawMinimap(screen)
 	// }
 }
 
@@ -97,7 +100,7 @@ func (g *Game) DrawMinimap(screen *ebiten.Image) {
 	for i := range g.maze {
 		for _, j := range g.maze[i] {
 			if j > 0 {
-				vector.DrawFilledRect(screen, float32(x), float32(y), float32(mazeScale), float32(mazeScale), color.White, false)
+				vector.DrawFilledRect(screen, float32(x), float32(y), float32(mazeScale), float32(mazeScale), g.wallColorsMinimap[g.maze[y/mazeScale][x/mazeScale]], false)
 			}
 			x += mazeScale
 		}
@@ -107,30 +110,27 @@ func (g *Game) DrawMinimap(screen *ebiten.Image) {
 }
 
 func (g *Game) DrawPlayer(screen *ebiten.Image) {
-	screen.Set(int(g.player.x)*mazeScale, int(g.player.y)*mazeScale, color.RGBA{255, 0, 0, 255})
+	screen.Set(int(g.player.x*mazeScale), int(g.player.y*mazeScale), color.RGBA{255, 0, 0, 255})
 }
 
 func (g *Game) DrawFov(screen *ebiten.Image) {
 	for i := 0.0; i < screenWidth; i++ {
-		var dist float64
 		cameraX := 2*i/float64(screenWidth) - 1
 		ray := Point{g.playerEyesDir.x + g.fov.x*cameraX, g.playerEyesDir.y + g.fov.y*cameraX}
 		dot := Point{math.Floor(g.player.x*mazeScale), math.Floor(g.player.y*mazeScale)}
 		deltaDistX, deltaDistY := float64(math.Abs(1/ray.x)), float64(math.Abs(1/ray.y))
 		stepX, stepY, sideDistX, sideDistY := g.startDists(ray, Point{dot.x/mazeScale,dot.y/mazeScale}, deltaDistX, deltaDistY)
-
+		
 		for g.maze[int(dot.y)/mazeScale][int(dot.x)/mazeScale] == 0 {
 			if sideDistX < sideDistY {
 				sideDistX += deltaDistX
 				dot.x += float64(stepX)
-				dist += deltaDistX
-			} else {
-				sideDistY += deltaDistY
-				dot.y += float64(stepY)
-				dist += deltaDistY
+				} else {
+					sideDistY += deltaDistY
+					dot.y += float64(stepY)
+				}
 			}
-		}
-		vector.StrokeLine(screen, float32(g.player.x*float64(mazeScale)), float32(g.player.y*float64(mazeScale)), float32(dot.x), float32(dot.y), 1, color.RGBA{255, 255, 0, 255}, false)
+			vector.StrokeLine(screen, float32(g.player.x*float64(mazeScale)), float32(g.player.y*float64(mazeScale)), float32(dot.x), float32(dot.y), 1, color.RGBA{255, 255, 0, 255}, false)
 	}
 }
 
@@ -174,8 +174,11 @@ func (g *Game) DrawWalls(screen *ebiten.Image) {
 			drawEnd = screenHeight - 1
 		}
 		
-
-	vector.StrokeLine(screen, float32(i),float32(drawStart),float32(i),float32(drawEnd),1,color.RGBA{0, 180, 0, 255},false)
+		if !wallVert {
+			vector.StrokeLine(screen, float32(i),float32(drawStart),float32(i),float32(drawEnd),1,g.wallColors[g.maze[int(dot.y)][int(dot.x)]],false)
+			} else {
+				vector.StrokeLine(screen, float32(i),float32(drawStart),float32(i),float32(drawEnd),1,g.wallColorsVert[g.maze[int(dot.y)][int(dot.x)]],false)
+		}
 	}
 }
 
@@ -211,16 +214,16 @@ func NewGame(width, height int) *Game {
 			{1, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 0, 0, 0, 1},
 			{1, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 			{1, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+			{1, 0, 0, 2, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+			{1, 0, 0, 2, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 3, 3, 0, 0, 1},
+			{1, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 3, 3, 0, 0, 1},
+			{1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+			{1, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 			{1, 0, 3, 0, 3, 0, 3, 0, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 1},
-			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 1},
-			{1, 0, 3, 0, 3, 0, 3, 0, 0, 0, 0, 0, 0, 0, 4, 0, 4, 4, 4, 1},
+			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 4, 0, 0, 0, 0, 1},
+			{1, 0, 3, 0, 3, 0, 3, 0, 0, 0, 2, 0, 0, 0, 4, 0, 4, 4, 4, 1},
 			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 4, 1},
 			{1, 0, 3, 0, 3, 0, 3, 0, 0, 0, 0, 0, 0, 0, 4, 4, 4, 4, 4, 1},
 			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
@@ -229,6 +232,9 @@ func NewGame(width, height int) *Game {
 		player:        Point{1.5, 1.5},
 		playerEyesDir: Point{-1, 0},
 		fov:           Point{0, 0.3},
+		wallColorsMinimap: map[int]color.RGBA{1: color.RGBA{255, 255, 255, 255}, 2: color.RGBA{255, 0, 0, 255}, 3: color.RGBA{0, 255, 0, 255}, 4: color.RGBA{0, 0, 255, 255}},
+		wallColors: map[int]color.RGBA{1: color.RGBA{220, 220, 220, 255}, 2: color.RGBA{220, 0, 0, 255}, 3: color.RGBA{0, 220, 0, 255}, 4: color.RGBA{0, 0, 220, 255}},
+		wallColorsVert: map[int]color.RGBA{1: color.RGBA{180, 180, 180, 255}, 2: color.RGBA{180, 0, 0, 255}, 3: color.RGBA{0, 180, 0, 255}, 4: color.RGBA{0, 0, 180, 255}},
 	}
 }
 
