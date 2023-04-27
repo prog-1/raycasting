@@ -34,6 +34,7 @@ type Game struct {
 	cellSize  float64   //[in pixels] (not in 'draw' due use in 'update')
 	pt        time.Time //previous frame time (for movement)
 	drawMap   bool      //draw map screen or not
+	fisheye   bool      //draw fish eye issue or not
 }
 
 //line with start & end points
@@ -51,6 +52,9 @@ func (g *Game) Update() error {
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyTab) {
 		g.drawMap = !g.drawMap //switch map screen drawing
+	}
+	if inpututil.IsKeyJustPressed(ebiten.KeyF) {
+		g.fisheye = !g.fisheye //switch fish eye drawing
 	}
 
 	//Time
@@ -116,7 +120,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	playerPixelPos := vector{(g.playerPos.x * g.cellSize) + mapPos.x, (g.playerPos.y * g.cellSize) + mapPos.y} // player position [in pixels]
 
-	viewLen := 150.0 //lenght of player view and camera plane lines [in pixels]
+	viewLen := 1.0 //lenght of player view and camera plane lines [in pixels] (setting higher will be problems with wall drawing)
 	//if len of viewDir = len of camPlane, then FoV = 90 degrees
 
 	rayAmount := sW // amount of rays
@@ -172,20 +176,20 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	//--------Walls--------
 	//---------------------
 
-	//function to draw wall in world screen depending on it's distance from player
-	drawWall := func(i float64, ray vector, rayLen float64, wi int) { //i - horizontal order, wi - wall index (for color)
-		wH := sH / rayLen //wall height
-		if wH > sH {
-			wH = sH
-		}
-		drawWallLine := func(col color.RGBA) {
-			ebitenutil.DrawLine(g.worldScreenBuffer, i, sH/2-wH, i, sH/2+wH, col)
-		}
+	//draw wall with proper height and color
+	drawWall := func(i float64, wH float64, wi int) { //i - horizontal order, wi - wall index (for color)
+
+		//color
+		var col color.RGBA
 		if wi == 1 {
-			drawWallLine(color.RGBA{200, 200, 200, 255} /*Light grey*/)
+			col = color.RGBA{200, 200, 200, 255} /*Light grey*/
 		} else if wi == 2 {
-			drawWallLine(color.RGBA{200, 0, 0, 255} /*Red*/)
+			col = color.RGBA{200, 0, 0, 255} /*Red*/
 		}
+
+		//wall
+		we := (sH - wH) / 2                                            //wall end
+		ebitenutil.DrawLine(g.worldScreenBuffer, i, we, i, sH-we, col) //drawing wall
 	}
 
 	//---------------------
@@ -209,12 +213,23 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		var r vector //ray point on camPlane
 		r.x = (camPlane.a.x + (segLenX * i))
 		r.y = (camPlane.a.y + (segLenY * i))
-		r = norm(r)                        //ray direction unit vector
-		rayLen, w := g.DDA(r)              //calculate ray length
-		ray := scale(r, rayLen*g.cellSize) //scale the ray
+		if g.fisheye {
+			r = norm(r) //ray direction unit vector (commented to deal with fish-eye)
+		}
+		rayLen, wi := g.DDA(r) //calculate ray length
 
-		ebitenutil.DrawLine(g.mapScreenBuffer, playerPixelPos.x, playerPixelPos.y, playerPixelPos.x+ray.x, playerPixelPos.y+ray.y, color.RGBA{242, 207, 85, 200} /*Yellow*/) //draw ray
-		drawWall(sW-(i+1), ray, rayLen, w)                                                                                                                                   //draw the wall in world screen
+		//draw ray on map screen
+		ray := scale(r, rayLen)                                                                                                                                                                        //scale the ray
+		ebitenutil.DrawLine(g.mapScreenBuffer, playerPixelPos.x, playerPixelPos.y, playerPixelPos.x+(ray.x*g.cellSize), playerPixelPos.y+(ray.y*g.cellSize), color.RGBA{242, 207, 85, 200} /*Yellow*/) //draw ray
+
+		//3D:
+		//fmt.Println("rayLen:", rayLen)
+		wH := sH / rayLen //rayLen is from 0 to 1
+		// if wH > sH{
+		//  wH = sH
+		// }
+		drawWall(sW-(i+1), wH, wi) //drawing wall on the world screen
+
 	}
 
 	//---------------------
@@ -409,7 +424,8 @@ func NewGame(width, height int) *Game {
 	viewDir := vector{0, -1}    //player view direction unit vector [in cells]
 	cellSize := 25.0            // size of each cell [in pixels] (not in 'draw' due use in 'update')
 	pt := time.Now()            //previous frame time (for movement)
-	drawMap := true             //map screen drawing switch variable
+	drawMap := true             //map screen drawing switch
+	fisheye := false            //fish eye switch
 
-	return &Game{sW: width, sH: height, gameMap: initGameMap(), playerPos: playerPos, viewDir: viewDir, cellSize: cellSize, pt: pt, drawMap: drawMap}
+	return &Game{sW: width, sH: height, gameMap: initGameMap(), playerPos: playerPos, viewDir: viewDir, cellSize: cellSize, pt: pt, drawMap: drawMap, fisheye: fisheye}
 }
