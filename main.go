@@ -34,12 +34,13 @@ type Player struct {
 	ms, rs float64 // Movement and Rotation speed
 }
 
-type game struct {
+type Game struct {
 	Maze [][]int
 	P    Player
-	RC   int   //Ray Count
-	pft  int64 // Previous frame time
-	f    bool  // Fisheye(true - on, false - off)
+	RC   int             //Ray Count
+	SB   []*ebiten.Image // Screen Buffers
+	pft  int64           // Previous frame time
+	f    bool            // Fisheye(true - on, false - off)
 }
 
 func FlipVertically(out *[][]int) {
@@ -59,13 +60,13 @@ func FlipVertically(out *[][]int) {
 		}
 	}
 }
-func NewGame() *game {
+func NewGame() *Game {
 	// Values in the maze:
 	// 0 - empty space
 	// 1 - pink wall
 	// 9 - player spawn
 	// NOTE: Maze must have player spawn walls along the perimeter
-	g := &game{
+	g := &Game{
 		Maze: [][]int{
 			{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
@@ -88,6 +89,7 @@ func NewGame() *game {
 			FOV: math.Pi / 3,
 		},
 		RC:  201,
+		SB:  []*ebiten.Image{ebiten.NewImage(sw, sh), ebiten.NewImage(sw, sh), ebiten.NewImage(sw, sh)},
 		pft: 0,
 		f:   false,
 	}
@@ -114,8 +116,8 @@ func NewGame() *game {
 	return g
 }
 
-func (g *game) Layout(outWidth, outHeight int) (w, h int) { return sw, sh }
-func (g *game) Update() error {
+func (g *Game) Layout(outWidth, outHeight int) (w, h int) { return sw, sh }
+func (g *Game) Update() error {
 	dt := float64(time.Now().UnixMilli() - g.pft)
 	sp := dt / 100 // speed factor
 	g.pft = time.Now().UnixMilli()
@@ -186,14 +188,14 @@ func getPerPendicularToCameraPlane(l float64, rad float64) float64 {
 	return l / (1 / math.Cos(rad))
 }
 
-var debug = ebiten.NewImage(sw, sh)
-var mb, wb = ebiten.NewImage(sw, sh), ebiten.NewImage(sw, sh) // Minimap and world buffers
-func (g *game) Draw(screen *ebiten.Image) {
+func (g *Game) Draw(screen *ebiten.Image) {
+	// Clearing:
 	screen.Clear()
-	mb.Clear()
-	wb.Clear()
-	debug.Clear()
+	for _, sb := range g.SB {
+		sb.Clear()
+	}
 
+	// Lambdas:
 	drawLine := func(s *ebiten.Image, a, b *vector2.Vector2, clr color.Color) {
 		u, v := a.MulScalar(cs), b.MulScalar(cs)
 		ebitenutil.DrawLine(s, u.X, u.Y, v.X, v.Y, clr)
@@ -203,6 +205,7 @@ func (g *game) Draw(screen *ebiten.Image) {
 		u, v := a.MulScalar(cs), b.MulScalar(cs)
 		ebitenutil.DrawRect(s, u.X, u.Y, v.X, v.Y, clr)
 	}
+
 	// Maze:
 	for y := range g.Maze {
 		for x := range g.Maze[y] {
@@ -216,7 +219,7 @@ func (g *game) Draw(screen *ebiten.Image) {
 					clr = color.White
 				}
 
-				ebitenutil.DrawRect(mb, cp.X, cp.Y, cs, cs, clr)
+				ebitenutil.DrawRect(g.SB[1], cp.X, cp.Y, cs, cs, clr)
 			}
 		}
 	}
@@ -228,27 +231,27 @@ func (g *game) Draw(screen *ebiten.Image) {
 		d := RotateZ(g.P.Dir, rad)
 		l := GetRayLengthToIntersection(g.P.Pos, d, &g.Maze)
 		// Line on minimap:
-		drawLine(mb, g.P.Pos, g.P.Pos.Add(d.MulScalar(l)), color.RGBA{255, 255, 0, 255})
+		drawLine(g.SB[1], g.P.Pos, g.P.Pos.Add(d.MulScalar(l)), color.RGBA{255, 255, 0, 255})
 		// Pseudo 3D:
 		const sch = float64(sh) / cs // Screen cell height(in cells)
 		var lh float64               // Wall line height(in cells)
 		if g.f {                     // Drawing with fisheye
 			lh = sch / l
-			ebitenutil.DebugPrint(debug, "on")
+			ebitenutil.DebugPrint(g.SB[2], "on")
 		} else {
 			lh = sch / getPerPendicularToCameraPlane(l, rad)
-			ebitenutil.DebugPrint(debug, "off")
+			ebitenutil.DebugPrint(g.SB[2], "off")
 		}
 		if lh > sch {
 			lh = sch
 		}
-		drawRect(wb, &vector2.Vector2{X: lw * i, Y: sch/2 - lh/2}, &vector2.Vector2{X: lw*i + 1, Y: lh}, color.White)
+		drawRect(g.SB[0], &vector2.Vector2{X: lw * i, Y: sch/2 - lh/2}, &vector2.Vector2{X: lw*i + 1, Y: lh}, color.White)
 		i++
 	}
 
 	// Drawing buffers:
 	// World:
-	screen.DrawImage(wb, &ebiten.DrawImageOptions{})
+	screen.DrawImage(g.SB[0], &ebiten.DrawImageOptions{})
 	// Minimap:
 	// Screen transformation:
 	opts := ebiten.DrawImageOptions{}
@@ -265,9 +268,9 @@ func (g *game) Draw(screen *ebiten.Image) {
 	opts.GeoM.Concat(p)                                                      // Multiplication
 	opts.GeoM.Scale(-1, -1)                                                  // Flipping
 	opts.GeoM.Translate(float64(len(g.Maze[0]))*cs, float64(len(g.Maze))*cs) // Moving coord. center to screen center
-	screen.DrawImage(mb, &opts)
+	screen.DrawImage(g.SB[1], &opts)
 	// Debug:
-	screen.DrawImage(debug, &ebiten.DrawImageOptions{})
+	screen.DrawImage(g.SB[2], &ebiten.DrawImageOptions{})
 }
 
 // Returns length of the ray casted from the point p in the direction of d to the wall in the map m
