@@ -59,37 +59,37 @@ func (g *Game) Update() error {
 		g.showMap = !g.showMap
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
-		a := int(g.pos.x+g.dir.x) / int(oneBlockWidthLength)
-		b := int(g.pos.y+g.dir.y) / int(oneBlockHeightLength)
+		a := int(g.pos.x + g.dir.x*0.1)
+		b := int(g.pos.y + g.dir.y*0.1)
 		if maze[b][a] == 0 {
-			g.pos.x += g.dir.x
-			g.pos.y += g.dir.y
+			g.pos.x += g.dir.x * 0.1
+			g.pos.y += g.dir.y * 0.1
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		a := int(g.pos.x-g.dir.x) / int(oneBlockWidthLength)
-		b := int(g.pos.y-g.dir.y) / int(oneBlockHeightLength)
+		a := int(g.pos.x - g.dir.x*0.1)
+		b := int(g.pos.y - g.dir.y*0.1)
 		if maze[b][a] == 0 {
-			g.pos.x -= g.dir.x
-			g.pos.y -= g.dir.y
+			g.pos.x -= g.dir.x * 0.1
+			g.pos.y -= g.dir.y * 0.1
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
 		tmp := Rotate(g.dir, -math.Pi/2)
-		a := int(g.pos.x+tmp.x) / int(oneBlockWidthLength)
-		b := int(g.pos.y+tmp.y) / int(oneBlockHeightLength)
+		a := int(g.pos.x + tmp.x*0.1)
+		b := int(g.pos.y + tmp.y*0.1)
 		if maze[b][a] == 0 {
-			g.pos.x += tmp.x
-			g.pos.y += tmp.y
+			g.pos.x += tmp.x * 0.1
+			g.pos.y += tmp.y * 0.1
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
 		tmp := Rotate(g.dir, math.Pi/2)
-		a := int(g.pos.x+tmp.x) / int(oneBlockWidthLength)
-		b := int(g.pos.y+tmp.y) / int(oneBlockHeightLength)
+		a := int(g.pos.x + tmp.x*0.1)
+		b := int(g.pos.y + tmp.y*0.1)
 		if maze[b][a] == 0 {
-			g.pos.x += tmp.x
-			g.pos.y += tmp.y
+			g.pos.x += tmp.x * 0.1
+			g.pos.y += tmp.y * 0.1
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) {
@@ -158,11 +158,14 @@ func raycast(screen *ebiten.Image, pos Point, dirx, diry float64, draw bool) (in
 		}
 		//Check if ray has hit a wall
 		// fmt.Println(mapX, mapY)
-		if maze[mapY/int(oneBlockHeightLength)][mapX/int(oneBlockWidthLength)] > 0 {
-			if draw {
-				ebitenutil.DrawLine(screen, pos.x, pos.y, float64(mapX), float64(mapY), color.RGBA{255, 255, 0, 255})
+		if maze[mapY][mapX] > 0 {
+			// if draw {
+			// 	ebitenutil.DrawLine(screen, pos.x*float64(oneBlockWidthLength), pos.y*float64(oneBlockHeightLength), float64(mapX)*float64(oneBlockWidthLength), float64(mapY)*float64(oneBlockWidthLength), color.RGBA{255, 255, 0, 255})
+			// }
+			if side == 0 {
+				return side, sideDistX - deltaDistX
 			}
-			return side, math.Sqrt(math.Pow(float64(mapX)-pos.x, 2) + math.Pow(float64(mapY)-pos.y, 2))
+			return side, sideDistY - deltaDistY
 		}
 	}
 }
@@ -171,9 +174,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// ebitenutil.DebugPrint(screen, "Hello, World!")
 	if g.showMap {
 		DrawMap(screen)
-		ebitenutil.DrawCircle(screen, g.pos.x, g.pos.y, 3, color.RGBA{255, 255, 0, 255})
+		ebitenutil.DrawCircle(screen, g.pos.x*float64(oneBlockWidthLength), g.pos.y*float64(oneBlockHeightLength), 3, color.RGBA{255, 255, 0, 255})
 	}
-	// fmt.Println(screen.Size())
 	for i, line := -FOV, 0.0; i <= FOV; i, line = i+2*FOV/(width-1), line+1 {
 		c := color.RGBA{91, 97, 89, 250}
 		tmp := Rotate(g.dir, i*math.Pi/180.0)
@@ -196,7 +198,7 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeigh
 func main() {
 	ebiten.SetWindowSize(width, height)
 	ebiten.SetWindowTitle("Hello, World!")
-	if err := ebiten.RunGame(&Game{Point{320, 350}, Point{0, -1}, false}); err != nil {
+	if err := ebiten.RunGame(&Game{Point{1.5, 1.5}, Point{0, -1}, true}); err != nil {
 		log.Fatal(err)
 	}
 }
