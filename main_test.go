@@ -137,7 +137,7 @@ func TestFlipMaze(t *testing.T) {
 		}},
 	} {
 		var got [][]int = tc.input
-		if FlipVertically(&got); !Same(&got, &tc.want) {
+		if NewGame().FlipVertically(&got); !Same(&got, &tc.want) {
 			t.Errorf("got = %v, want = %v", got, tc.want)
 		}
 	}

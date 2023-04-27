@@ -35,31 +35,16 @@ type Player struct {
 }
 
 type Game struct {
-	Maze [][]int
-	P    Player
-	RC   int             //Ray Count
-	SB   []*ebiten.Image // Screen Buffers
-	pft  int64           // Previous frame time
-	f    bool            // Fisheye(true - on, false - off)
+	Maze           [][]int
+	P              Player
+	RC             int             //Ray Count
+	SB             []*ebiten.Image // Screen Buffers
+	FlipVertically func(out *[][]int)
+
+	pft int64 // Previous frame time
+	f   bool  // Fisheye(true - on, false - off)
 }
 
-func FlipVertically(out *[][]int) {
-	if len(*out) == 0 {
-		return
-	}
-
-	swap := func(a, b *int) {
-		tmp := *a
-		*a = *b
-		*b = tmp
-	}
-
-	for c := 0; c < len((*out)[0]); c++ {
-		for r := 0; r < len(*out)/2; r++ {
-			swap(&(*out)[r][c], &(*out)[len(*out)-r-1][c])
-		}
-	}
-}
 func NewGame() *Game {
 	// Values in the maze:
 	// 0 - empty space
@@ -94,7 +79,24 @@ func NewGame() *Game {
 		f:   false,
 	}
 
-	FlipVertically(&g.Maze)
+	g.FlipVertically = func(out *[][]int) {
+		if len(*out) == 0 {
+			return
+		}
+
+		swap := func(a, b *int) {
+			tmp := *a
+			*a = *b
+			*b = tmp
+		}
+
+		for c := 0; c < len((*out)[0]); c++ {
+			for r := 0; r < len(*out)/2; r++ {
+				swap(&(*out)[r][c], &(*out)[len(*out)-r-1][c])
+			}
+		}
+	}
+	g.FlipVertically(&g.Maze)
 
 	// Player Pos:
 	var x, y int
