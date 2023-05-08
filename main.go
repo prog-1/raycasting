@@ -1,7 +1,11 @@
 package main
 
 import (
+	"bytes"
+	_ "embed"
+	"image"
 	"image/color"
+	_ "image/png"
 	"log"
 	"math"
 
@@ -15,29 +19,32 @@ const (
 	height = 640.0
 )
 
+//go:embed 1.png
+var tex1 []byte
+
 var (
 	maze = [][]int{
-		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-		{1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1},
-		{1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1},
-		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1},
-		{1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1},
-		{1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-		{1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1},
-		{1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1},
-		{1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1},
-		{1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1},
-		{1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1},
-		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1},
-		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1},
-		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1},
-		{1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1},
-		{1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1},
-		{1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1},
-		{1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1},
-		{1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1},
-		{1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1},
-		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+		{2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2},
+		{2, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 2},
+		{2, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 2},
+		{2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 2},
+		{2, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 2},
+		{2, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2},
+		{2, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 2},
+		{2, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 2},
+		{2, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 1, 2},
+		{2, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 2},
+		{2, 1, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 2},
+		{2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 2},
+		{2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 2},
+		{2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 2},
+		{2, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 2},
+		{2, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 2},
+		{2, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 1, 2},
+		{2, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 2},
+		{2, 0, 0, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 2},
+		{2, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 2},
+		{2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2},
 	}
 	oneBlockWidthLength  = width / len(maze[0])
 	oneBlockHeightLength = height / len(maze)
@@ -52,6 +59,7 @@ type Game struct {
 	pos     Point
 	dir     Point
 	showMap bool
+	tex1    *ebiten.Image
 }
 
 func (g *Game) Update() error {
@@ -123,7 +131,7 @@ func abs(a float64) float64 {
 	return a
 }
 
-func raycast(screen *ebiten.Image, pos Point, dirx, diry float64, draw bool) (int, float64) {
+func raycast(screen *ebiten.Image, pos Point, dirx, diry float64, draw bool) (side int, distance float64, wallType int) {
 	mapX, mapY := int(pos.x), int(pos.y)
 
 	deltaDistX := abs(1 / dirx)
@@ -144,7 +152,6 @@ func raycast(screen *ebiten.Image, pos Point, dirx, diry float64, draw bool) (in
 		stepY = 1
 		sideDistY = (float64(mapY) + 1.0 - pos.y) * deltaDistY
 	}
-	var side int
 	for {
 		//jump to next map square, either in x-direction, or in y-direction
 		if sideDistX < sideDistY {
@@ -163,9 +170,9 @@ func raycast(screen *ebiten.Image, pos Point, dirx, diry float64, draw bool) (in
 			// 	ebitenutil.DrawLine(screen, pos.x*float64(oneBlockWidthLength), pos.y*float64(oneBlockHeightLength), float64(mapX)*float64(oneBlockWidthLength), float64(mapY)*float64(oneBlockWidthLength), color.RGBA{255, 255, 0, 255})
 			// }
 			if side == 0 {
-				return side, sideDistX - deltaDistX
+				return side, sideDistX - deltaDistX, maze[mapY][mapX]
 			}
-			return side, sideDistY - deltaDistY
+			return side, sideDistY - deltaDistY, maze[mapY][mapX]
 		}
 	}
 }
@@ -180,13 +187,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		c := color.RGBA{91, 97, 89, 250}
 		tmp := Rotate(g.dir, i*math.Pi/180.0)
 		// ebitenutil.DrawLine(screen, g.pos.x, g.pos.y, g.pos.x+tmp.x*1000, g.pos.y+tmp.y*1000, color.RGBA{255, 255, 0, 255})
-		side, distance := raycast(screen, g.pos, tmp.x, tmp.y, g.showMap)
+		side, distance, wallType := raycast(screen, g.pos, tmp.x, tmp.y, g.showMap)
 		if side == 1 {
 			c = color.RGBA{155, 161, 153, 255}
 		}
-		ebitenutil.DrawLine(screen, line, height/2, line, (height/2)+(height/2)/distance, c)
-		ebitenutil.DrawLine(screen, line, height/2, line, (height/2)-(height/2)/distance, c)
-
+		if wallType != 1 {
+			ebitenutil.DrawLine(screen, line, height/2, line, (height/2)+(height/2)/distance, c)
+			ebitenutil.DrawLine(screen, line, height/2, line, (height/2)-(height/2)/distance, c)
+		}
 	}
 	// ebitenutil.DrawRect(screen, float64(a*oneBlockWidthLength), float64(b*oneBlockHeightLength), float64(oneBlockWidthLength), float64(oneBlockHeightLength), color.RGBA{0, 0, 255, 255})
 }
@@ -196,9 +204,14 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeigh
 }
 
 func main() {
+	im, _, err := image.Decode(bytes.NewReader(tex1))
+	if err != nil {
+		panic(err)
+	}
+	a := ebiten.NewImageFromImage(im)
 	ebiten.SetWindowSize(width, height)
 	ebiten.SetWindowTitle("Hello, World!")
-	if err := ebiten.RunGame(&Game{Point{1.5, 1.5}, Point{0, -1}, true}); err != nil {
+	if err := ebiten.RunGame(&Game{Point{1.5, 1.5}, Point{0, -1}, true, a}); err != nil {
 		log.Fatal(err)
 	}
 }
