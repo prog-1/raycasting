@@ -31,8 +31,36 @@ type Pair[T, U any] struct {
 type Player struct {
 	Pos    *vector2.Vector2
 	Dir    *vector2.Vector2
+	MS, RS float64 // Movement and Rotation speed
 	FOV    float64
-	ms, rs float64 // Movement and Rotation speed
+}
+
+// Returns an instance of Player struct with specified Field Of View(FOV), Movement Speed(MS) and Rotation Speed(RC)
+// Note that player will be spawned in the cell marked as player start(9)
+func NewPlayer(Maze *[][]int, FOV, MS, RS float64) *Player {
+	// Player Pos:
+	var x, y int
+	for y = range *Maze {
+		for x = range (*Maze)[y] {
+			if (*Maze)[y][x] == 9 {
+				break
+			}
+		}
+		if (*Maze)[y][x] == 9 {
+			break
+		}
+	}
+	if x == len((*Maze)[0])-1 && y == len(*Maze)-1 { // Maze's bottom right cell(which has to be a wall) -> No 9 in maze
+		panic("Maze must have player spawn(9)")
+	}
+
+	return &Player{
+		Pos: &vector2.Vector2{X: float64(x) + 0.5, Y: float64(y) + 0.5},
+		Dir: &vector2.Vector2{X: 0, Y: 1},
+		MS:  MS,
+		RS:  RS,
+		FOV: FOV,
+	}
 }
 
 type Game struct {
@@ -52,32 +80,29 @@ func NewGame() *Game {
 	// 1 - pink wall
 	// 9 - player spawn
 	// NOTE: Maze must have player spawn walls along the perimeter
+	m := [][]int{
+		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+		{1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1},
+		{1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1},
+		{1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1},
+		{1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1},
+		{1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1},
+		{1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1},
+		{1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1},
+		{1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1},
+		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+		{1, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+	}
 	g := &Game{
-		Maze: [][]int{
-			{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1},
-			{1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1},
-			{1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1},
-			{1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1},
-			{1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1},
-			{1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1},
-			{1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1},
-			{1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1},
-			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-		},
-		P: Player{
-			Dir: &vector2.Vector2{X: 0, Y: 1},
-			ms:  0.2, rs: 0.00125,
-			FOV: math.Pi / 3,
-		},
-		RC:  201,
-		SB:  []*ebiten.Image{ebiten.NewImage(sw, sh), ebiten.NewImage(sw, sh), ebiten.NewImage(sw, sh)},
-		pft: 0,
-		f:   false,
+		Maze: m,
+		P:    *NewPlayer(&m, math.Pi/3, 0.2, 0.00125),
+		RC:   201,
+		SB:   []*ebiten.Image{ebiten.NewImage(sw, sh), ebiten.NewImage(sw, sh), ebiten.NewImage(sw, sh)},
+		pft:  0,
+		f:    false,
 	}
 
 	g.FlipVertically = func(out *[][]int) {
@@ -98,23 +123,6 @@ func NewGame() *Game {
 		}
 	}
 	g.FlipVertically(&g.Maze)
-
-	// Player Pos:
-	var x, y int
-	for y = range g.Maze {
-		for x = range g.Maze[y] {
-			if g.Maze[y][x] == 9 {
-				break
-			}
-		}
-		if g.Maze[y][x] == 9 {
-			break
-		}
-	}
-	if x == len(g.Maze[0])-1 && y == len(g.Maze)-1 { // Maze's bottom right cell(which has to be a wall) -> No 9 in maze
-		panic("Maze must have player spawn(9)")
-	}
-	g.P.Pos = &vector2.Vector2{X: float64(x) + 0.5, Y: float64(y) + 0.5}
 
 	return g
 }
@@ -147,24 +155,24 @@ func (g *Game) Update() error {
 
 	// Movement:
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
-		upp(*g.P.Dir.MulScalar(g.P.ms * sp))
+		upp(*g.P.Dir.MulScalar(g.P.MS * sp))
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		upp(*g.P.Dir.MulScalar(-g.P.ms * sp))
+		upp(*g.P.Dir.MulScalar(-g.P.MS * sp))
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		upp(*RotateZ(g.P.Dir, math.Pi/2).MulScalar(g.P.ms * sp))
+		upp(*RotateZ(g.P.Dir, math.Pi/2).MulScalar(g.P.MS * sp))
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		upp(*RotateZ(g.P.Dir, -math.Pi/2).MulScalar(g.P.ms * sp))
+		upp(*RotateZ(g.P.Dir, -math.Pi/2).MulScalar(g.P.MS * sp))
 	}
 
-	// Rotation:
+	// Rotation:1
 	if ebiten.IsKeyPressed(ebiten.KeyQ) {
-		g.P.Dir = RotateZ(g.P.Dir, g.P.rs*dt)
+		g.P.Dir = RotateZ(g.P.Dir, g.P.RS*dt)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyE) {
-		g.P.Dir = RotateZ(g.P.Dir, -g.P.rs*dt)
+		g.P.Dir = RotateZ(g.P.Dir, -g.P.RS*dt)
 	}
 
 	// Toggling fisheye:
@@ -282,19 +290,19 @@ func GetRayLengthToIntersection(p, d *vector2.Vector2, m *[][]int) float64 {
 
 	var l vector2.Vector2                                                                                 // Total line length from stepping to the neighbors along OX and OY
 	step := vector2.Vector2{X: math.Sqrt(1 + (d.Y/d.X)*(d.Y/d.X)), Y: math.Sqrt(1 + (d.X/d.Y)*(d.X/d.Y))} // Ray's length from the current intersection point to another along OX and OY
-	var ms Pair[int, int]                                                                                 // maze step(+1 or -1)
+	var MS Pair[int, int]                                                                                 // maze step(+1 or -1)
 	if d.X > 0 {
-		ms.X = 1
+		MS.X = 1
 		l.X = (1 - frac(p.X)) * step.X
 	} else {
-		ms.X = -1
+		MS.X = -1
 		l.X = frac(p.X) * step.X
 	}
 	if d.Y > 0 {
-		ms.Y = 1
+		MS.Y = 1
 		l.Y = (1 - frac(p.Y)) * step.Y
 	} else {
-		ms.Y = -1
+		MS.Y = -1
 		l.Y = frac(p.Y) * step.Y
 	}
 	var len float64                         // Ray's length to the intersection point with the wall
@@ -303,11 +311,11 @@ func GetRayLengthToIntersection(p, d *vector2.Vector2, m *[][]int) float64 {
 		if l.X < l.Y {
 			len = l.X
 			l.X += step.X
-			c.X += ms.X
+			c.X += MS.X
 		} else {
 			len = l.Y
 			l.Y += step.Y
-			c.Y += ms.Y
+			c.Y += MS.Y
 		}
 	}
 	return len
