@@ -184,17 +184,24 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		ebitenutil.DrawCircle(screen, g.pos.x*float64(oneBlockWidthLength), g.pos.y*float64(oneBlockHeightLength), 3, color.RGBA{255, 255, 0, 255})
 	}
 	for i, line := -FOV, 0.0; i <= FOV; i, line = i+2*FOV/(width-1), line+1 {
-		c := color.RGBA{91, 97, 89, 250}
 		tmp := Rotate(g.dir, i*math.Pi/180.0)
-		// ebitenutil.DrawLine(screen, g.pos.x, g.pos.y, g.pos.x+tmp.x*1000, g.pos.y+tmp.y*1000, color.RGBA{255, 255, 0, 255})
-		side, distance, wallType := raycast(screen, g.pos, tmp.x, tmp.y, g.showMap)
+		side, distance, _ := raycast(screen, g.pos, tmp.x, tmp.y, g.showMap)
+		// ebitenutil.DrawLine(screen, g.pos.x*float64(oneBlockWidthLength), g.pos.y*float64(oneBlockHeightLength), (g.pos.x+tmp.x*distance)*float64(oneBlockWidthLength), (g.pos.y+tmp.y*distance)*float64(oneBlockHeightLength), color.RGBA{255, 255, 0, 255})
+		_, fracx := math.Modf(g.pos.y + tmp.y*distance)
 		if side == 1 {
-			c = color.RGBA{155, 161, 153, 255}
+			_, fracx = math.Modf(g.pos.x + tmp.x*distance)
+
 		}
-		if wallType != 1 {
-			ebitenutil.DrawLine(screen, line, height/2, line, (height/2)+(height/2)/distance, c)
-			ebitenutil.DrawLine(screen, line, height/2, line, (height/2)-(height/2)/distance, c)
-		}
+		// _, _ := math.Modf(g.pos.y + tmp.y*distance)
+		width, h := g.tex1.Size()
+		a := g.tex1.SubImage(image.Rect(int(float64(width)*fracx), 0, int(float64(width)*fracx)+1, h)).(*ebiten.Image)
+		options := &ebiten.DrawImageOptions{}
+		options.GeoM.Scale(1, float64(width)/height/distance)
+		options.GeoM.Translate(line, (height/2)-(height/2)/distance)
+		// Draw 3d
+		// ebitenutil.DrawLine(screen, line, height/2, line, (height/2)+(height/2)/distance, c)
+		// ebitenutil.DrawLine(screen, line, height/2, line, (height/2)-(height/2)/distance, c)
+		screen.DrawImage(a, options)
 	}
 	// ebitenutil.DrawRect(screen, float64(a*oneBlockWidthLength), float64(b*oneBlockHeightLength), float64(oneBlockWidthLength), float64(oneBlockHeightLength), color.RGBA{0, 0, 255, 255})
 }
